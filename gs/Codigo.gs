@@ -196,6 +196,27 @@ function respaldar_() {
   archivos.slice(30).forEach(function (f) { f.setTrashed(true); });
 }
 
+// SOLO PARA ENTREGAR UN SISTEMA NUEVO: borra TODOS los datos de prueba y reinicia la numeración en 1.
+// No está en el menú a propósito (para que nadie la toque por error): se ejecuta a mano desde el editor de Apps Script
+// (selector de funciones > reiniciarParaEntrega > Ejecutar). Pide doble confirmación. Conserva formatos y Config.
+function reiniciarParaEntrega() {
+  const ui = SpreadsheetApp.getUi();
+  if (ui.alert('⚠️ Borrar TODOS los datos', 'Se borran productos, ventas, pagos, detalle y movimientos, y la numeración vuelve a 1.\n\nNO se puede deshacer. ¿Seguro?', ui.ButtonSet.YES_NO) !== ui.Button.YES) return;
+  const t = ui.prompt('Confirmación final', 'Escribí BORRAR (en mayúsculas) para confirmar:', ui.ButtonSet.OK_CANCEL);
+  if (t.getSelectedButton() !== ui.Button.OK || t.getResponseText().trim() !== 'BORRAR') { avisar_('Cancelado. No se borró nada.'); return; }
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    ['Productos', 'Ventas', 'Detalle', 'Pagos', 'Movimientos'].forEach(function (n) {
+      const h = hoja_(n), f = h.getLastRow();
+      if (f > 1) h.getRange(2, 1, f - 1, h.getLastColumn()).clearContent();
+    });
+    const props = PropertiesService.getScriptProperties();
+    ['SEQ_PROD', 'SEQ_VENTA', 'SEQ_PAGO'].forEach(function (k) { props.deleteProperty(k); });
+  } finally { lock.releaseLock(); }
+  avisar_('Listo: todo en cero ✅\n\nAhora poné el nombre del negocio en la hoja Config (celda B2).');
+}
+
 function revisarDatosMenu() {
   const av = revisarDatos_(leerProductos_());
   avisar_(av.length ? 'Hay ' + av.length + ' cosas para revisar:\n\n• ' + av.join('\n• ') : 'Todo en orden ✅');
