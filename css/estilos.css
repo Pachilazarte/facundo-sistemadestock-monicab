@@ -1,0 +1,96 @@
+/* Componentes repetidos. Los colores salen SIEMPRE de colores.css (variables --c-*). */
+
+html, body { height: 100%; }
+[hidden] { display: none !important; } /* el atributo hidden debe ganarle a clases como flex */
+body {
+  font-family: 'Manrope', system-ui, sans-serif;
+  background: rgb(var(--c-fondo));
+  color: rgb(var(--c-texto));
+  -webkit-font-smoothing: antialiased;
+}
+.num { font-variant-numeric: tabular-nums; }
+:focus-visible { outline: 2px solid rgb(var(--c-marca)); outline-offset: 2px; }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: rgb(var(--c-borde)); border-radius: 99px; border: 2px solid rgb(var(--c-fondo)); }
+
+/* Campos */
+.campo {
+  width: 100%; background: rgb(var(--c-superficie)); border: 1px solid rgb(var(--c-borde));
+  border-radius: 10px; padding: .6rem .8rem; transition: border-color .15s, box-shadow .15s;
+}
+.campo::placeholder { color: rgb(var(--c-suave) / .7); }
+.campo:focus { outline: none; border-color: rgb(var(--c-marca)); box-shadow: 0 0 0 3px rgb(var(--c-marca) / .18); }
+.campo[readonly] { background: rgb(var(--c-hundido)); }
+.etiqueta { display: block; font-size: .75rem; font-weight: 700; color: rgb(var(--c-suave)); margin: .9rem 0 .35rem; }
+
+/* Botones */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: .4rem; cursor: pointer;
+  border-radius: 10px; padding: .55rem .9rem; font-weight: 700; font-size: .875rem; white-space: nowrap;
+  border: 1px solid rgb(var(--c-borde)); background: rgb(var(--c-superficie));
+  transition: background .15s, transform .08s;
+}
+.btn:hover { background: rgb(var(--c-hundido)); }
+.btn:active { transform: scale(.97); }
+.btn:disabled { opacity: .45; cursor: not-allowed; transform: none; }
+.btn-marca { background: rgb(var(--c-marca)); border-color: rgb(var(--c-marca)); color: rgb(var(--c-sobre-marca)); }
+.btn-marca:hover { background: rgb(var(--c-marca-osc)); }
+.btn-peligro { color: rgb(var(--c-peligro)); }
+.btn-peligro:hover { background: rgb(var(--c-peligro-claro)); }
+.btn-sm { padding: .3rem .6rem; font-size: .8rem; border-radius: 8px; }
+.btn-ico { padding: .4rem; border-radius: 8px; border-color: transparent; background: transparent; }
+
+/* Chips (categorías y métodos de pago) */
+.chip {
+  display: inline-flex; align-items: center; gap: .35rem; padding: .35rem .8rem; border-radius: 99px; cursor: pointer;
+  font-size: .8rem; font-weight: 700; border: 1px solid rgb(var(--c-borde)); background: rgb(var(--c-superficie));
+  color: rgb(var(--c-suave)); transition: all .12s; white-space: nowrap;
+}
+.chip:hover { color: rgb(var(--c-texto)); border-color: rgb(var(--c-suave) / .5); }
+.chip.on { background: rgb(var(--c-marca)); border-color: rgb(var(--c-marca)); color: rgb(var(--c-sobre-marca)); }
+
+/* Navegación lateral */
+.nav-item {
+  display: flex; align-items: center; gap: .75rem; width: 100%; padding: .65rem .8rem; border-radius: 10px; cursor: pointer;
+  font-weight: 700; font-size: .9rem; color: rgb(var(--c-lateral-texto)); transition: background .12s, color .12s; position: relative;
+}
+.nav-item:hover { background: rgb(var(--c-lateral-activo) / .06); color: rgb(var(--c-lateral-activo)); }
+.nav-item.on { background: rgb(var(--c-lateral-activo) / .12); color: rgb(var(--c-lateral-activo)); }
+.nav-item.on::before { content: ''; position: absolute; left: -12px; top: 22%; bottom: 22%; width: 3px; border-radius: 3px; background: rgb(var(--c-marca-claro)); }
+
+/* Tablas */
+.tabla th {
+  text-align: left; font-size: .7rem; font-weight: 800; letter-spacing: .06em; text-transform: uppercase;
+  color: rgb(var(--c-suave)); padding: .7rem 1rem; border-bottom: 1px solid rgb(var(--c-borde)); white-space: nowrap;
+}
+.tabla td { padding: .75rem 1rem; border-bottom: 1px solid rgb(var(--c-borde) / .7); vertical-align: middle; }
+.tabla tbody tr:last-child td { border-bottom: 0; }
+.tabla tbody tr:hover td { background: rgb(var(--c-hundido) / .6); }
+.tabla .r { text-align: right; }
+.fila-click { cursor: pointer; }
+
+/* Modal */
+dialog {
+  border: 0; padding: 0; border-radius: 18px; width: min(520px, 94vw); max-height: 92vh;
+  background: rgb(var(--c-superficie)); color: rgb(var(--c-texto)); box-shadow: 0 24px 70px rgb(var(--c-texto) / .28);
+}
+dialog[open] { animation: pop .18s ease-out; }
+dialog::backdrop { background: rgb(var(--c-texto) / .45); animation: fade .18s ease-out; }
+@keyframes pop { from { opacity: 0; transform: translateY(10px) scale(.98); } }
+@keyframes fade { from { opacity: 0; } }
+
+/* Toast */
+.toast-in { animation: sube .2s ease-out; }
+@keyframes sube { from { opacity: 0; transform: translateY(8px); } }
+
+/* Botón de sincronizar girando */
+.girando svg { animation: gira 1s linear infinite; }
+@keyframes gira { to { transform: rotate(360deg); } }
+
+/* Pulso cuando se agrega un producto al ticket */
+.pulso { animation: pulso .25s ease-out; }
+@keyframes pulso { 50% { transform: scale(1.04); } }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}

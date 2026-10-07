@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stock Lite</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0d6e64"><!-- = --c-marca de colores.css (el navegador no lee variables acá) -->
+<link rel="icon" type="image/png" href="icons/icon-192.png">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+<!-- Colores (única fuente) y componentes -->
+<link rel="stylesheet" href="css/colores.css">
+<link rel="stylesheet" href="css/estilos.css">
+
+<!-- Tailwind + su config (lee los colores de colores.css) e íconos Lucide -->
+<script src="https://cdn.tailwindcss.com/3.4.16"></script>
+<script src="js/tailwind-config.js"></script>
+<script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
+</head>
+
+<body>
+<div class="flex h-dvh">
+
+  <!-- ============ BARRA LATERAL ============ -->
+  <aside class="w-[230px] max-md:w-[72px] shrink-0 bg-lateral flex flex-col px-3 py-4 gap-1">
+    <div class="flex items-center gap-3 px-2 pb-5">
+      <span class="grid place-items-center w-9 h-9 rounded-xl bg-marca text-marca-sobre shrink-0"><i data-lucide="store" class="w-5 h-5"></i></span>
+      <div class="max-md:hidden min-w-0">
+        <div id="negocio" class="font-extrabold text-lateral-activo truncate leading-tight">Stock Lite</div>
+        <div class="text-xs text-lateral-texto">Stock · Ventas · Cobros</div>
+      </div>
+    </div>
+
+    <nav id="nav" class="flex flex-col gap-1">
+      <button class="nav-item on" data-tab="vender"><i data-lucide="shopping-cart" class="w-5 h-5 shrink-0"></i><span class="max-md:hidden">Vender</span></button>
+      <button class="nav-item" data-tab="stock"><i data-lucide="package" class="w-5 h-5 shrink-0"></i><span class="max-md:hidden">Stock</span></button>
+      <button class="nav-item" data-tab="cobros"><i data-lucide="wallet" class="w-5 h-5 shrink-0"></i><span class="max-md:hidden">Cobros</span>
+        <span id="nDeuda" hidden class="ml-auto max-md:hidden bg-peligro text-marca-sobre text-[11px] font-extrabold rounded-full px-2 py-0.5"></span></button>
+      <button class="nav-item" data-tab="ventas"><i data-lucide="receipt" class="w-5 h-5 shrink-0"></i><span class="max-md:hidden">Ventas</span></button>
+      <button class="nav-item" data-tab="resumen"><i data-lucide="layout-dashboard" class="w-5 h-5 shrink-0"></i><span class="max-md:hidden">Resumen</span></button>
+    </nav>
+
+    <div class="mt-auto flex flex-col gap-2 px-1">
+      <div id="syncTxt" class="text-xs text-lateral-texto max-md:hidden px-1">—</div>
+      <div id="ver" class="text-[11px] text-lateral-texto/60 max-md:hidden px-1"></div>
+      <div class="flex gap-2 max-md:flex-col">
+        <button id="btnSync" class="nav-item justify-center" title="Actualizar datos"><i data-lucide="refresh-cw" class="w-4 h-4"></i></button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ============ CONTENIDO ============ -->
+  <main class="flex-1 min-w-0 min-h-0 flex flex-col">
+    <button id="actualizar" hidden class="shrink-0 flex items-center gap-2 bg-marca text-marca-sobre font-bold text-sm px-6 py-2.5 text-left hover:bg-marca-osc"></button>
+    <button id="avisos" hidden class="shrink-0 flex items-center gap-2 bg-aviso-claro text-aviso font-bold text-sm px-6 py-2.5 text-left hover:brightness-95"></button>
+    <div id="vistas" class="flex-1 min-h-0 overflow-y-auto">
+
+    <!-- VENDER -->
+    <section id="t-vender" class="tab lg:h-full grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_400px]">
+      <div class="flex flex-col min-h-0 px-6 pt-6 lg:px-8">
+        <div class="relative">
+          <i data-lucide="search" class="w-5 h-5 text-suave absolute left-4 top-1/2 -translate-y-1/2"></i>
+          <input id="q" class="campo !pl-12 !py-3.5 text-base !rounded-2xl" placeholder="Buscá por nombre, o escribí el N° y Enter…" autocomplete="off">
+        </div>
+        <div id="cats" class="flex gap-2 overflow-x-auto py-4"></div>
+        <div id="grid" class="grid grid-cols-[repeat(auto-fill,minmax(155px,1fr))] gap-3 overflow-y-auto pt-2 pb-6 pr-2 content-start flex-1 min-h-0"></div>
+      </div>
+
+      <!-- Ticket -->
+      <aside class="bg-superficie border-l border-borde flex flex-col min-h-0 max-lg:border-l-0 max-lg:border-t">
+        <div class="flex items-center gap-2 px-5 py-4 border-b border-borde">
+          <i data-lucide="receipt" class="w-5 h-5 text-marca"></i>
+          <h2 class="font-extrabold text-lg">Ticket</h2>
+          <span id="cartCount" class="text-sm text-suave"></span>
+          <button id="btnVaciar" class="btn btn-sm btn-peligro ml-auto"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i>Vaciar</button>
+        </div>
+
+        <div id="cart" class="flex-1 min-h-[160px] overflow-y-auto px-5"></div>
+
+        <div class="border-t border-borde px-5 pt-4 pb-5 bg-superficie">
+          <div class="flex items-baseline justify-between">
+            <span class="text-sm font-bold text-suave">Total</span>
+            <span id="total" class="text-4xl font-extrabold tracking-tight num">$ 0,00</span>
+          </div>
+
+          <label class="etiqueta">Método de pago</label>
+          <div id="metodos" class="flex flex-wrap gap-2"></div>
+
+          <div class="flex items-end gap-2">
+            <div class="flex-1">
+              <label class="etiqueta">Paga ahora</label>
+              <input id="monto" class="campo num font-bold" inputmode="decimal" aria-label="Paga ahora">
+            </div>
+            <button class="btn" data-m="total" title="Pagar el total">Total</button>
+            <button class="btn" data-m="cero" title="Dejar todo a cuenta">A cuenta</button>
+          </div>
+          <div id="saldoInfo" class="min-h-6 mt-2"></div>
+
+          <label class="etiqueta !mt-1">Cliente <span class="font-medium">(obligatorio si queda saldo)</span></label>
+          <div class="relative">
+            <i data-lucide="user" class="w-4 h-4 text-suave absolute left-3.5 top-1/2 -translate-y-1/2"></i>
+            <input id="cliente" class="campo !pl-10" placeholder="Mostrador" list="clientes" autocomplete="off">
+          </div>
+          <datalist id="clientes"></datalist>
+
+          <button id="btnCobrar" class="btn btn-marca w-full !py-4 !text-lg !rounded-2xl mt-4" disabled>
+            <i data-lucide="check" class="w-5 h-5"></i><span>Cobrar</span><span id="cobrarTotal" class="num"></span>
+          </button>
+        </div>
+      </aside>
+    </section>
+
+    <!-- STOCK -->
+    <section id="t-stock" class="tab hidden px-6 py-7 lg:px-10 max-w-7xl mx-auto">
+      <div class="flex flex-wrap items-center gap-3 mb-5">
+        <div class="mr-auto"><h2 class="text-2xl font-extrabold">Stock</h2><p id="stockSub" class="text-sm text-suave"></p></div>
+        <div class="relative">
+          <i data-lucide="search" class="w-4 h-4 text-suave absolute left-3.5 top-1/2 -translate-y-1/2"></i>
+          <input id="qs" class="campo !pl-10 w-64" placeholder="Buscar producto…">
+        </div>
+        <button id="chipBajo" class="chip"><i data-lucide="triangle-alert" class="w-3.5 h-3.5"></i>Solo stock bajo</button>
+        <button id="btnIngreso" class="btn"><i data-lucide="plus" class="w-4 h-4"></i>Ingreso de stock</button>
+        <button id="btnNuevoProd" class="btn btn-marca"><i data-lucide="package-plus" class="w-4 h-4"></i>Nuevo producto</button>
+      </div>
+      <div class="bg-superficie border border-borde rounded-2xl overflow-x-auto">
+        <table class="tabla w-full">
+          <thead><tr><th>Producto</th><th class="r">Costo</th><th class="r">Precio</th><th class="r">Margen</th><th class="r">Stock</th><th></th></tr></thead>
+          <tbody id="stockBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- COBROS -->
+    <section id="t-cobros" class="tab hidden px-6 py-7 lg:px-10 max-w-7xl mx-auto">
+      <div class="flex flex-wrap items-center gap-3 mb-5">
+        <div class="mr-auto"><h2 class="text-2xl font-extrabold">Cobros pendientes</h2><p id="cobrosSub" class="text-sm text-suave"></p></div>
+        <div class="relative">
+          <i data-lucide="search" class="w-4 h-4 text-suave absolute left-3.5 top-1/2 -translate-y-1/2"></i>
+          <input id="qc" class="campo !pl-10 w-72" placeholder="Cliente o N° de venta…">
+        </div>
+      </div>
+      <div class="bg-superficie border border-borde rounded-2xl overflow-x-auto">
+        <table class="tabla w-full">
+          <thead><tr><th>Cliente</th><th>Venta</th><th class="r">Total</th><th class="r">Pagado</th><th class="r">Debe</th><th></th></tr></thead>
+          <tbody id="cobrosBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- VENTAS -->
+    <section id="t-ventas" class="tab hidden px-6 py-7 lg:px-10 max-w-7xl mx-auto">
+      <div class="flex flex-wrap items-center gap-3 mb-5">
+        <div class="mr-auto"><h2 class="text-2xl font-extrabold">Ventas</h2><p class="text-sm text-suave">Tocá una venta para ver el detalle, cobrarla o anularla.</p></div>
+        <div class="relative">
+          <i data-lucide="search" class="w-4 h-4 text-suave absolute left-3.5 top-1/2 -translate-y-1/2"></i>
+          <input id="qv" class="campo !pl-10 w-72" placeholder="Cliente o N° de venta…">
+        </div>
+      </div>
+      <div class="bg-superficie border border-borde rounded-2xl overflow-x-auto">
+        <table class="tabla w-full">
+          <thead><tr><th>#</th><th>Fecha</th><th>Cliente</th><th class="r">Total</th><th class="r">Saldo</th><th>Estado</th></tr></thead>
+          <tbody id="ventasBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- RESUMEN -->
+    <section id="t-resumen" class="tab hidden px-6 py-7 lg:px-10 max-w-7xl mx-auto">
+      <div class="flex flex-wrap items-center gap-3 mb-5">
+        <div class="mr-auto"><h2 class="text-2xl font-extrabold">Resumen</h2><p class="text-sm text-suave">Cómo viene el negocio y qué hay que atender.</p></div>
+        <div id="periodos" class="flex gap-2">
+          <button class="chip on" data-p="hoy">Hoy</button>
+          <button class="chip" data-p="semana">7 días</button>
+          <button class="chip" data-p="mes">Este mes</button>
+        </div>
+      </div>
+      <div id="kpis" class="grid grid-cols-[repeat(auto-fit,minmax(170px,1fr))] gap-4 mb-4"></div>
+      <div id="kpis2" class="grid grid-cols-[repeat(auto-fit,minmax(170px,1fr))] gap-4 mb-5"></div>
+      <div class="grid lg:grid-cols-2 gap-4 mb-4">
+        <div class="bg-superficie border border-borde rounded-2xl p-5">
+          <h3 class="font-extrabold flex items-center gap-2 mb-4"><i data-lucide="banknote" class="w-5 h-5 text-marca"></i>Cobrado por método</h3>
+          <div id="caja" class="flex flex-col gap-4"></div>
+        </div>
+        <div class="bg-superficie border border-borde rounded-2xl p-5">
+          <h3 class="font-extrabold flex items-center gap-2 mb-2"><i data-lucide="trending-up" class="w-5 h-5 text-marca"></i>Más vendidos</h3>
+          <div id="top"></div>
+        </div>
+      </div>
+      <div class="bg-superficie border border-borde rounded-2xl p-5">
+        <h3 class="font-extrabold flex items-center gap-2 mb-2"><i data-lucide="triangle-alert" class="w-5 h-5 text-aviso"></i>Stock bajo o agotado</h3>
+        <div id="bajo" class="max-h-80 overflow-y-auto"></div>
+      </div>
+    </section>
+    </div>
+  </main>
+</div>
+
+<div id="toast" class="fixed bottom-4 right-4 flex flex-col gap-2 z-50 pointer-events-none"></div>
+
+<script src="js/config.js"></script>
+<script src="js/version.js"></script>
+<script src="js/utils.js"></script>
+<script src="js/api.js"></script>
+<script src="js/pwa.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
