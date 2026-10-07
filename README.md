@@ -15,18 +15,25 @@ gs/Codigo.gs                                      → el backend (va en la plani
 
 > El link de cada cliente **no** va en el repo (es su llave de acceso). `js/config.js` queda vacío.
 
-## 2. Alta de un cliente nuevo (≈ 10 min)
+## 2. Alta de un cliente nuevo (≈ 10 min, con SU cuenta de Google)
 
-1. Hacé una copia de la planilla base (o creá una nueva) y en **Extensiones > Apps Script** pegá `gs/Codigo.gs`.
-2. Ejecutá `configurarSistema` y aceptá los permisos.
-3. **Implementar > Nueva implementación > Aplicación web** — Ejecutar como: *Yo* · Acceso: *Cualquier usuario*. Copiá la URL (`.../macros/s/AKfy.../exec`).
-4. En la planilla: menú **🧾 Stock Lite > Activar respaldo diario**.
-5. Armá el **link de instalación** con el ID del medio de esa URL:
+**Una sola vez — preparar la plantilla (en tu cuenta):**
+1. Creá una planilla limpia con `gs/Codigo.gs` pegado en Apps Script, ejecutá `configurarSistema` y, si tiene datos de prueba, `reiniciarParaEntrega`. Nombre sugerido: *Stock Lite - PLANTILLA*. **No la implementes como app web** (las copias no heredan despliegues, y así queda sin enlaces ni contadores).
+2. **Compartir > Cualquier persona con el enlace > Lector**.
+3. Tu link de copia es la URL de la planilla cambiando el final `/edit...` por `/copy`:
+   `https://docs.google.com/spreadsheets/d/ID_PLANTILLA/copy`
 
+**Por cada cliente — en la PC del cliente, con la sesión de Google DEL CLIENTE:**
+1. Abrí el link de copia y tocá **Hacer una copia**. La planilla (con su script ya adentro) queda en el Drive del cliente.
+2. Recargá la planilla → menú **🧾 Stock Lite > Configurar / reparar sistema** y aceptá los permisos (*Avanzado > Ir a… > Permitir*).
+3. En la hoja **Config**, celda **B2**: nombre del negocio.
+4. **Extensiones > Apps Script > Implementar > Nueva implementación > Aplicación web** — Ejecutar como: *Yo* · Acceso: *Cualquier usuario*. Copiá la URL (`.../macros/s/AKfy.../exec`).
+5. Menú **🧾 Stock Lite > Activar respaldo diario**.
+6. Armá el **link de instalación** con el ID del medio de esa URL:
    `https://TU-USUARIO.github.io/NOMBRE-REPO/?c=ID_DEL_SCRIPT`
+7. Abrilo en **Chrome o Edge** y tocá **Instalar** (ícono en la barra de direcciones, o menú ⋮ > *Guardar y compartir > Instalar*). Queda un ícono en el escritorio. El link se guarda solo en esa PC.
 
-6. En la PC del cliente, abrí ese link en **Chrome o Edge** y tocá **Instalar** (ícono en la barra de direcciones, o menú ⋮ > *Guardar y compartir > Instalar Stock Lite*). Queda un ícono en el escritorio y abre en su propia ventana.
-   El link se guarda solo en esa PC: el cliente nunca ve ni escribe nada.
+> Como el cliente es el dueño de la planilla y del despliegue ("Ejecutar como: Yo"), los datos y los respaldos quedan en SU Drive.
 
 ## 3. Publicar una actualización de la app
 
