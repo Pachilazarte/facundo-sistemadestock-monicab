@@ -91,6 +91,24 @@ dialog::backdrop { background: rgb(var(--c-texto) / .45); animation: fade .18s e
 .pulso { animation: pulso .25s ease-out; }
 @keyframes pulso { 50% { transform: scale(1.04); } }
 
+/* Pantallas bajas (netbook 1024x600): el ticket se compacta para que SIEMPRE se vea el botón Cobrar y varios productos. */
+@media (max-height: 720px) {
+  #ticketHead { padding-top: .5rem; padding-bottom: .5rem; }
+  #ticketHead h2 { font-size: 1rem; }
+  #pie { padding: .55rem 1rem .75rem; }
+  #pie .etiqueta { display: none; }
+  #pie #total { font-size: 1.75rem; line-height: 1.1; }
+  #pie .campo { padding-top: .4rem; padding-bottom: .4rem; }
+  #pie #metodos { flex-wrap: nowrap; overflow-x: auto; margin-top: .45rem; padding-bottom: 2px; }
+  #pie #metodos .chip { flex-shrink: 0; padding: .25rem .65rem; }
+  #pie #monto { margin-top: .45rem; }
+  #pie [data-m] { margin-top: .45rem; padding: .4rem .7rem; }
+  #pie #saldoInfo { min-height: 0; margin-top: .35rem; }
+  #pie #cliente { margin-top: .1rem; }
+  #pie #btnCobrar { padding: .6rem !important; font-size: 1rem !important; margin-top: .55rem !important; }
+  #cart { min-height: 120px !important; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }

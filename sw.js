@@ -1,10 +1,10 @@
 /* Service worker: la app abre sin internet y se actualiza sola.
  *  - Archivos propios: primero la red (siempre la última versión de GitHub), y si no hay internet, la copia guardada.
- *  - Librerías externas (Tailwind, Lucide, fuente): primero la copia guardada (son versiones fijas).
+ *  - Librerías externas (solo la fuente de Google): primero la copia guardada (son versiones fijas).
  *  - Las llamadas a Google Apps Script NUNCA pasan por acá: los datos siempre salen frescos del servidor. */
 importScripts('js/version.js');
 const CACHE = 'stocklite-' + APP_VERSION;
-const NUCLEO = ['./', 'index.html', 'css/colores.css', 'css/estilos.css', 'js/version.js', 'js/config.js', 'js/tailwind-config.js',
+const NUCLEO = ['./', 'index.html', 'css/colores.css', 'css/estilos.css', 'css/tailwind.css', 'js/vendor/lucide-0.468.0.min.js', 'js/version.js', 'js/config.js',
   'js/utils.js', 'js/api.js', 'js/pwa.js', 'js/app.js', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png'];
 
 self.addEventListener('install', e => {

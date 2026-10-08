@@ -37,7 +37,7 @@ gs/Codigo.gs                                      → el backend (va en la plani
 
 ## 3. Publicar una actualización de la app
 
-1. Hacé los cambios, **subí `APP_VERSION` en `js/version.js`** y hacé push.
+1. Hacé los cambios. Si tocaste clases de Tailwind en `index.html` o `js/*.js`, corré **`construir-css.bat`** (regenera `css/tailwind.css`; necesita Node e internet en TU PC). Después **subí `APP_VERSION` en `js/version.js`** y hacé push.
 2. Listo. Las PCs instaladas toman los archivos nuevos cada vez que abren la app, y si la tienen abierta todo el día, en ≤30 min muestran la barra *"Hay una versión nueva — tocá para actualizar"*.
 
 ## 4. Actualizar el backend (Codigo.gs) de un cliente
@@ -54,5 +54,6 @@ Cuando cambies el backend de forma que la app vieja ya no sirva: subí `VERSION_
 
 - **Sin internet:** la app abre igual (copia guardada), pero las ventas necesitan conexión. Si se corta a mitad de una venta, el ticket queda guardado y se reintenta sin duplicar.
 - **Uso local sin instalar:** abrí `index.html?c=ID_DEL_SCRIPT` directo desde la carpeta (sin actualizaciones automáticas).
+- **Equipos viejos (netbook con Windows 7 de 32 bits):** ver la Parte F de `GUIA-INSTALACION-CLIENTE.md`. El CSS va precompilado (no se compila en el navegador) justamente para que ande liviano.
 - **Marca/colores:** todo sale de `css/colores.css`. Si cambiás `--c-marca` o `--c-fondo`, actualizá también `theme_color` / `background_color` en `manifest.webmanifest` y el `<meta name="theme-color">` de `index.html` (el navegador no lee variables ahí).
 - **Íconos:** `icons/icon-192.png` y `icon-512.png` (reemplazables por el logo del cliente).

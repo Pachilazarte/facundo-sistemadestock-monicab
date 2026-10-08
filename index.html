@@ -16,38 +16,37 @@
 <link rel="stylesheet" href="css/colores.css">
 <link rel="stylesheet" href="css/estilos.css">
 
-<!-- Tailwind + su config (lee los colores de colores.css) e íconos Lucide -->
-<script src="https://cdn.tailwindcss.com/3.4.16"></script>
-<script src="js/tailwind-config.js"></script>
-<script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
+<!-- Tailwind ya compilado (se genera con construir-css.bat; los colores salen de colores.css) e íconos Lucide locales -->
+<link rel="stylesheet" href="css/tailwind.css">
+<script src="js/vendor/lucide-0.468.0.min.js"></script>
 </head>
 
 <body>
 <div class="flex h-dvh">
 
   <!-- ============ BARRA LATERAL ============ -->
-  <aside class="w-[230px] max-md:w-[72px] shrink-0 bg-lateral flex flex-col px-3 py-4 gap-1">
+  <aside class="w-[230px] max-xl:w-[72px] shrink-0 bg-lateral flex flex-col px-3 py-4 gap-1">
     <div class="flex items-center gap-3 px-2 pb-5">
       <span class="grid place-items-center w-9 h-9 rounded-xl bg-marca text-marca-sobre shrink-0"><i data-lucide="store" class="w-5 h-5"></i></span>
-      <div class="max-md:hidden min-w-0">
+      <div class="max-xl:hidden min-w-0">
         <div id="negocio" class="font-extrabold text-lateral-activo truncate leading-tight">Stock Lite</div>
         <div class="text-xs text-lateral-texto">Stock · Ventas · Cobros</div>
       </div>
     </div>
 
     <nav id="nav" class="flex flex-col gap-1">
-      <button class="nav-item on" data-tab="vender"><i data-lucide="shopping-cart" class="w-5 h-5 shrink-0"></i><span class="max-md:hidden">Vender</span></button>
-      <button class="nav-item" data-tab="stock"><i data-lucide="package" class="w-5 h-5 shrink-0"></i><span class="max-md:hidden">Stock</span></button>
-      <button class="nav-item" data-tab="cobros"><i data-lucide="wallet" class="w-5 h-5 shrink-0"></i><span class="max-md:hidden">Cobros</span>
-        <span id="nDeuda" hidden class="ml-auto max-md:hidden bg-peligro text-marca-sobre text-[11px] font-extrabold rounded-full px-2 py-0.5"></span></button>
-      <button class="nav-item" data-tab="ventas"><i data-lucide="receipt" class="w-5 h-5 shrink-0"></i><span class="max-md:hidden">Ventas</span></button>
-      <button class="nav-item" data-tab="resumen"><i data-lucide="layout-dashboard" class="w-5 h-5 shrink-0"></i><span class="max-md:hidden">Resumen</span></button>
+      <button class="nav-item on" data-tab="vender"><i data-lucide="shopping-cart" class="w-5 h-5 shrink-0"></i><span class="max-xl:hidden">Vender</span></button>
+      <button class="nav-item" data-tab="stock"><i data-lucide="package" class="w-5 h-5 shrink-0"></i><span class="max-xl:hidden">Stock</span></button>
+      <button class="nav-item" data-tab="cobros"><i data-lucide="wallet" class="w-5 h-5 shrink-0"></i><span class="max-xl:hidden">Cobros</span>
+        <span id="nDeuda" hidden class="ml-auto max-xl:hidden bg-peligro text-marca-sobre text-[11px] font-extrabold rounded-full px-2 py-0.5"></span></button>
+      <button class="nav-item" data-tab="ventas"><i data-lucide="receipt" class="w-5 h-5 shrink-0"></i><span class="max-xl:hidden">Ventas</span></button>
+      <button class="nav-item" data-tab="resumen"><i data-lucide="layout-dashboard" class="w-5 h-5 shrink-0"></i><span class="max-xl:hidden">Resumen</span></button>
     </nav>
 
     <div class="mt-auto flex flex-col gap-2 px-1">
-      <div id="syncTxt" class="text-xs text-lateral-texto max-md:hidden px-1">—</div>
-      <div id="ver" class="text-[11px] text-lateral-texto/60 max-md:hidden px-1"></div>
-      <div class="flex gap-2 max-md:flex-col">
+      <div id="syncTxt" class="text-xs text-lateral-texto max-xl:hidden px-1">—</div>
+      <div id="ver" class="text-[11px] text-lateral-texto/60 max-xl:hidden px-1"></div>
+      <div class="flex gap-2 max-xl:flex-col">
         <button id="btnSync" class="nav-item justify-center" title="Actualizar datos"><i data-lucide="refresh-cw" class="w-4 h-4"></i></button>
       </div>
     </div>
@@ -60,7 +59,7 @@
     <div id="vistas" class="flex-1 min-h-0 overflow-y-auto">
 
     <!-- VENDER -->
-    <section id="t-vender" class="tab lg:h-full grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_400px]">
+    <section id="t-vender" class="tab lg:h-full grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_380px]">
       <div class="flex flex-col min-h-0 px-6 pt-6 lg:px-8">
         <div class="relative">
           <i data-lucide="search" class="w-5 h-5 text-suave absolute left-4 top-1/2 -translate-y-1/2"></i>
@@ -72,7 +71,7 @@
 
       <!-- Ticket -->
       <aside class="bg-superficie border-l border-borde flex flex-col min-h-0 max-lg:border-l-0 max-lg:border-t">
-        <div class="flex items-center gap-2 px-5 py-4 border-b border-borde">
+        <div id="ticketHead" class="flex items-center gap-2 px-5 py-4 border-b border-borde">
           <i data-lucide="receipt" class="w-5 h-5 text-marca"></i>
           <h2 class="font-extrabold text-lg">Ticket</h2>
           <span id="cartCount" class="text-sm text-suave"></span>
@@ -81,7 +80,7 @@
 
         <div id="cart" class="flex-1 min-h-[160px] overflow-y-auto px-5"></div>
 
-        <div class="border-t border-borde px-5 pt-4 pb-5 bg-superficie">
+        <div id="pie" class="border-t border-borde px-5 pt-4 pb-5 bg-superficie">
           <div class="flex items-baseline justify-between">
             <span class="text-sm font-bold text-suave">Total</span>
             <span id="total" class="text-4xl font-extrabold tracking-tight num">$ 0,00</span>
@@ -93,7 +92,7 @@
           <div class="flex items-end gap-2">
             <div class="flex-1">
               <label class="etiqueta">Paga ahora</label>
-              <input id="monto" class="campo num font-bold" inputmode="decimal" aria-label="Paga ahora">
+              <input id="monto" class="campo num font-bold" inputmode="decimal" aria-label="Paga ahora" placeholder="Paga ahora">
             </div>
             <button class="btn" data-m="total" title="Pagar el total">Total</button>
             <button class="btn" data-m="cero" title="Dejar todo a cuenta">A cuenta</button>
@@ -103,7 +102,7 @@
           <label class="etiqueta !mt-1">Cliente <span class="font-medium">(obligatorio si queda saldo)</span></label>
           <div class="relative">
             <i data-lucide="user" class="w-4 h-4 text-suave absolute left-3.5 top-1/2 -translate-y-1/2"></i>
-            <input id="cliente" class="campo !pl-10" placeholder="Mostrador" list="clientes" autocomplete="off">
+            <input id="cliente" class="campo !pl-10" placeholder="Cliente (si no, Mostrador)" list="clientes" autocomplete="off">
           </div>
           <datalist id="clientes"></datalist>
 
