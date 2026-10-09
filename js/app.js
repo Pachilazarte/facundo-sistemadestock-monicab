@@ -2,7 +2,7 @@
 /* Vistas y acciones: Vender, Stock, Cobros, Ventas, Resumen.
  * Se dibuja SOLO la pestaña que se ve (las otras se dibujan al entrar): en una PC lenta es lo que más se nota. */
 
-let cart = [], cartNonce = null, montoEdit = false, metodoSel = null, catSel = '', soloBajo = false;
+let cart = [], cartNonce = null, montoEdit = false, metodoSel = null, fiado = false, otrosAbierto = false, catSel = '', soloBajo = false;
 let tabActual = 'vender', limiteGrid = 48, periodoSel = 'hoy', resCache = {}, resSeq = 0;
 const LIM_GRID = 48, LIM_STOCK = 200, LIM_VENTAS = 120;
 const servidorNuevo = () => (S.version || 1) >= 3; // v3: permite borrar productos y trae el detalle de ventas en la carga
@@ -146,7 +146,7 @@ function renderCart() {
         <p class="font-bold text-texto">El ticket está vacío</p><p class="text-sm">Tocá un producto o escribí su N° y Enter.</p></div></div>`;
   $('#total').textContent = money(total);
   $('#cobrarTotal').textContent = cart.length ? '· ' + money(total) : '';
-  if (!montoEdit) $('#monto').value = total ? String(total).replace('.', ',') : '';
+  if (!montoEdit && !fiado) $('#monto').value = total ? String(total).replace('.', ',') : '';
   actualizarSaldo();
   $('#btnCobrar').disabled = !cart.length;
   $('#btnVaciar').classList.toggle('invisible', !cart.length);
@@ -156,7 +156,7 @@ function renderCart() {
 function actualizarSaldo() {
   const total = totalCart(), m = parseNum($('#monto').value), saldo = r2(total - (isNaN(m) ? 0 : m));
   let html = '';
-  if (cart.length) {
+  if (cart.length && fiado) {
     if (saldo > 0.009) html = `<span class="inline-flex items-center gap-1.5 rounded-lg bg-aviso-claro text-aviso text-sm font-bold px-2.5 py-1">${ic('clock', 'w-4 h-4')}Queda a cuenta: ${money(saldo)}</span>`;
     else if (saldo < -0.009) html = `<span class="inline-flex items-center gap-1.5 rounded-lg bg-peligro-claro text-peligro text-sm font-bold px-2.5 py-1">${ic('circle-alert', 'w-4 h-4')}El pago supera el total</span>`;
     else html = `<span class="inline-flex items-center gap-1.5 rounded-lg bg-ok-claro text-ok text-sm font-bold px-2.5 py-1">${ic('circle-check', 'w-4 h-4')}Pago completo</span>`;
@@ -170,7 +170,7 @@ let borradorListo = false;
 function guardarBorrador() {
   try {
     if (!cart.length) return localStorage.removeItem(DRAFT_KEY);
-    localStorage.setItem(DRAFT_KEY, JSON.stringify({cart, nonce: cartNonce, cliente: $('#cliente').value, metodo: metodoSel, monto: $('#monto').value, montoEdit}));
+    localStorage.setItem(DRAFT_KEY, JSON.stringify({cart, nonce: cartNonce, cliente: $('#cliente').value, metodo: metodoSel, fiado, monto: $('#monto').value, montoEdit}));
   } catch (e) {}
 }
 function restaurarBorrador() {
@@ -183,9 +183,10 @@ function restaurarBorrador() {
     if (!cart.length) return localStorage.removeItem(DRAFT_KEY);
     cartNonce = d.nonce || uid(); montoEdit = !!d.montoEdit;
     if (d.metodo && S.metodos.includes(d.metodo)) metodoSel = d.metodo;
-    $('#cliente').value = d.cliente || '';
+    $('#cliente').value = d.cliente || ''; fiado = !!d.fiado;
     renderMetodos(); renderCart();
     if (montoEdit) { $('#monto').value = d.monto; actualizarSaldo(); }
+    infoCliente();
     toast('Se recuperó el ticket que había quedado abierto', 'info');
   } catch (e) {}
 }
@@ -198,7 +199,7 @@ $('#cart').addEventListener('input', e => {
   const l = cart[fila.dataset.i]; l[f] = n;
   $('[data-sub]', fila).textContent = money(l.cantidad * l.precio);
   $('#total').textContent = money(totalCart()); $('#cobrarTotal').textContent = '· ' + money(totalCart());
-  if (!montoEdit) $('#monto').value = String(totalCart()).replace('.', ',');
+  if (!montoEdit && !fiado) $('#monto').value = String(totalCart()).replace('.', ',');
   actualizarSaldo(); guardarBorrador();
 });
 $('#cart').addEventListener('change', e => {
@@ -221,29 +222,63 @@ $('#cart').addEventListener('click', e => {
 });
 
 function renderMetodos() {
-  if (!S.metodos.includes(metodoSel)) metodoSel = S.metodos[0];
-  $('#metodos').innerHTML = S.metodos.map(m => `<button class="chip ${m === metodoSel ? 'on' : ''}" data-metodo="${esc(m)}">${esc(m)}</button>`).join('');
+  const ms = S.metodos;
+  const ef = ms.find(m => plain(m).includes('efectivo')) || ms[0], tr = ms.find(m => plain(m).includes('transf'));
+  const fijos = [...new Set([ef, tr].filter(Boolean))], otros = ms.filter(m => !fijos.includes(m));
+  if (!ms.includes(metodoSel)) metodoSel = ef;
+  const enOtros = otros.includes(metodoSel);
+  if (enOtros && !fiado) otrosAbierto = true;
+  const chip = (m) => `<button class="chip ${!fiado && m === metodoSel ? 'on' : ''}" data-metodo="${esc(m)}">${esc(m)}</button>`;
+  $('#metodos').innerHTML = fijos.map(chip).join('')
+    + `<button class="chip ${fiado ? 'on' : ''}" data-fiado title="Queda debiendo: se anota a nombre de un cliente">Pendiente</button>`
+    + (otros.length ? `<button class="chip ${!fiado && enOtros ? 'on' : ''}" data-otros aria-expanded="${otrosAbierto}">Otros</button>` : '');
+  $('#metodosOtros').hidden = !(otros.length && otrosAbierto);
+  $('#metodosOtros').innerHTML = otros.map(chip).join('');
+  $('#bloqueFiado').hidden = !fiado;
   $('#clientes').innerHTML = [...new Set(S.ventas.map(x => x.cliente).filter(c => c && c !== 'Mostrador'))].map(c => `<option value="${esc(c)}">`).join('');
 }
-$('#metodos').addEventListener('click', e => { const b = e.target.closest('[data-metodo]'); if (b) { metodoSel = b.dataset.metodo; renderMetodos(); guardarBorrador(); } });
+function infoCliente() {
+  const c = $('#cliente').value.trim(), el = $('#clienteInfo');
+  if (!c) { el.textContent = ''; return; }
+  const k = plain(c), ventas = S.ventas.filter(x => plain(x.cliente) === k);
+  if (!ventas.length) { el.innerHTML = `<span class="text-marca">Cliente nuevo: se crea al cobrar</span>`; return; }
+  const deuda = r2(ventas.reduce((a, x) => a + (x.estado !== 'Anulada' ? x.saldo : 0), 0));
+  el.innerHTML = deuda > 0.009 ? `<span class="text-aviso">Ya existe · hoy debe ${money(deuda)}</span>` : 'Ya existe · no debe nada';
+}
+$('#cliente').addEventListener('input', debounce(infoCliente, 200));
+function modoFiado(on) {
+  fiado = on; montoEdit = on;
+  $('#monto').value = on ? '' : (totalCart() ? String(totalCart()).replace('.', ',') : '');
+  renderMetodos(); actualizarSaldo(); infoCliente(); guardarBorrador();
+  if (on) $('#cliente').focus();
+}
+$('#metodos').addEventListener('click', e => {
+  if (e.target.closest('[data-fiado]')) return modoFiado(!fiado);
+  if (e.target.closest('[data-otros]')) { otrosAbierto = !otrosAbierto; return renderMetodos(); }
+  const b = e.target.closest('[data-metodo]'); if (b) elegirMetodo(b.dataset.metodo);
+});
+$('#metodosOtros').addEventListener('click', e => { const b = e.target.closest('[data-metodo]'); if (b) elegirMetodo(b.dataset.metodo); });
+function elegirMetodo(m) {
+  metodoSel = m;
+  if (fiado) return modoFiado(false); // elegir cómo paga = deja de ser pendiente
+  renderMetodos(); guardarBorrador();
+}
 $('#monto').addEventListener('input', () => { montoEdit = true; actualizarSaldo(); guardarBorrador(); });
-$$('[data-m]').forEach(b => b.addEventListener('click', () => {
-  if (b.dataset.m === 'total') { montoEdit = false; $('#monto').value = totalCart() ? String(totalCart()).replace('.', ',') : ''; }
-  else { montoEdit = true; $('#monto').value = '0'; }
-  actualizarSaldo(); guardarBorrador();
-}));
-function vaciarTicket() { cart = []; cartNonce = null; montoEdit = false; $('#cliente').value = ''; renderCart(); renderGrid(); }
+function vaciarTicket() { cart = []; cartNonce = null; montoEdit = false; fiado = false; $('#cliente').value = ''; $('#clienteInfo').textContent = ''; renderMetodos(); renderCart(); renderGrid(); }
 $('#btnVaciar').addEventListener('click', () => { vaciarTicket(); $('#q').focus(); });
 
 ['#monto', '#cliente'].forEach(s => $(s).addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); $('#btnCobrar').click(); } }));
 $('#btnCobrar').addEventListener('click', async () => {
   const b = $('#btnCobrar'); if (b.disabled || !cart.length) return;
   const total = totalCart();
-  const monto = $('#monto').value.trim() === '' ? 0 : parseNum($('#monto').value);
+  const monto = !fiado ? total : $('#monto').value.trim() === '' ? 0 : parseNum($('#monto').value);
   if (isNaN(monto) || monto < 0) return toast('El monto no es válido', 'err');
   if (monto > total + 0.001) return toast('El pago supera el total', 'err');
-  const saldo = r2(total - monto), cliente = $('#cliente').value.trim();
-  if (saldo > 0.009 && !cliente) { $('#cliente').focus(); return toast('Poné el nombre del cliente para dejar saldo a cuenta', 'err'); }
+  const saldo = r2(total - monto);
+  let cliente = fiado ? $('#cliente').value.trim() : '';
+  if (fiado && !cliente) { $('#cliente').focus(); return toast('Elegí o escribí el nombre del cliente que queda debiendo', 'err'); }
+  const previo = cliente && S.ventas.find(x => plain(x.cliente) === plain(cliente)); // si ya existe, se usa tal cual está escrito en la planilla
+  if (previo) cliente = previo.cliente;
   const payload = {cliente, metodo: metodoSel, pagoMonto: monto, items: cart.map(l => ({codigo: l.codigo, cantidad: l.cantidad, precio: l.precio}))};
   const lineas = cart.map(l => [l.codigo, l.nombre, l.cantidad, l.precio, r2(l.cantidad * l.precio)]); // para mostrar el detalle sin pedirlo
   b.disabled = true; $('span', b).textContent = 'Guardando…';

@@ -103,10 +103,9 @@ dialog [data-body] { min-height: 0; flex: 1 1 auto; } /* el cuerpo se desplaza; 
   #pie .etiqueta { display: none; }
   #pie #total { font-size: 1.75rem; line-height: 1.1; }
   #pie .campo { padding-top: .4rem; padding-bottom: .4rem; }
-  #pie #metodos { flex-wrap: nowrap; overflow-x: auto; margin-top: .45rem; padding-bottom: 2px; }
-  #pie #metodos .chip { flex-shrink: 0; padding: .25rem .65rem; }
-  #pie #monto { margin-top: .45rem; }
-  #pie [data-m] { margin-top: .45rem; padding: .4rem .7rem; }
+  #pie #metodos, #pie #metodosOtros { margin-top: .45rem; gap: .35rem; }
+  #pie .chip { padding: .25rem .55rem; font-size: .78rem; }
+  #pie #monto { margin-top: .35rem; }
   #pie #saldoInfo { min-height: 0; margin-top: .35rem; }
   #pie #cliente { margin-top: .1rem; }
   #pie #btnCobrar { padding: .6rem !important; font-size: 1rem !important; margin-top: .55rem !important; }
@@ -137,26 +136,27 @@ dialog [data-body] { min-height: 0; flex: 1 1 auto; } /* el cuerpo se desplaza; 
  * (con el atajo Alt+N de cada sección). Todo lo que usa rem crece junto con la letra base. */
 html.vg { font-size: 112.5%; }
 html.vg #app { flex-direction: column; }
-html.vg #lateral { width: auto !important; flex-direction: row; align-items: center; padding: .3rem .6rem; gap: .35rem; min-width: 0; }
+html.vg #lateral { width: auto !important; flex-direction: row; align-items: center; padding: .2rem .6rem; gap: .25rem; min-width: 0; }
+html.vg #marcaBox > span { width: 1.9rem; height: 1.9rem; border-radius: .6rem; }
+html.vg #marcaBox > span svg { width: 1.05rem; height: 1.05rem; }
 html.vg #marcaBox { padding: 0 .35rem 0 0; }
 html.vg #marcaTxt { display: none !important; } /* en 1024 px no entra el nombre: queda el ícono (el nombre está en el título de la ventana) */
 html.vg .sub-marca { display: none; }
 html.vg #nav { flex-direction: row; gap: .15rem; }
 html.vg #nav .nav-item {
-  width: auto; display: grid; grid-template-columns: auto auto; grid-template-areas: "i l" "i h"; column-gap: .5rem; row-gap: .1rem;
-  align-items: center; justify-items: start; padding: .35rem .6rem; font-size: 1rem;
+  width: auto; gap: .4rem; align-items: center; padding: .3rem .65rem; font-size: .95rem; border-radius: 8px;
 }
-html.vg #nav .nav-item svg { grid-area: i; }
-html.vg .nav-lbl { display: inline !important; grid-area: l; line-height: 1.1; }
-html.vg .nav-hint { display: block; grid-area: h; }
-html.vg #nDeuda:not([hidden]) { display: inline-block !important; position: absolute; top: -3px; right: -5px; margin: 0; }
-html.vg #nav .nav-item.on::before { left: 14%; right: 14%; top: auto; bottom: -5px; width: auto; height: 3px; }
+html.vg #nav .nav-item svg { width: 1.1rem; height: 1.1rem; }
+html.vg .nav-lbl { display: inline !important; line-height: 1.1; }
+html.vg .nav-hint { display: inline; font-size: .6rem; opacity: .5; }
+html.vg #nDeuda:not([hidden]) { display: inline-block !important; position: absolute; top: -4px; right: -10px; margin: 0; }
+html.vg #nav .nav-item.on::before { left: 14%; right: 14%; top: auto; bottom: -3px; width: auto; height: 2px; }
 html.vg #lateralPie { margin: 0 0 0 auto; flex-direction: row; align-items: center; gap: .5rem; padding: 0; }
 html.vg #lateralPie > div { flex-direction: row !important; }
-html.vg #syncTxt { display: block !important; font-size: .68rem; line-height: 1.15; max-width: 4.6rem; padding: 0; }
+html.vg #syncTxt { display: block !important; font-size: .65rem; line-height: 1.1; max-width: 4.6rem; padding: 0; }
 html.vg #ver { display: none !important; }
 html.vg .vg-lbl { display: none !important; } /* queda "Aa" encendido; el nombre está en el título (tooltip) */
-html.vg #btnVG { padding: .55rem .7rem; }
+html.vg #btnVG, html.vg #btnSync { padding: .35rem .6rem; }
 
 /* Controles más cómodos de tocar y de leer */
 html.vg .btn { padding: .7rem 1.1rem; font-size: 1rem; }
