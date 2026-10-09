@@ -104,6 +104,7 @@ async function sync(silencioso) {
   try {
     const j = await api('cargar');
     if (mi !== syncSeq) return;
+    if (j.redirect && j.redirect !== CFG.url && URL_OK.test(j.redirect) && !sessionStorage.getItem('stocklite_mudado')) { await mudarse(j.redirect); if (mi !== syncSeq) return; }
     const avisos = j.avisos || [];
     if ((j.version || 1) < SERVIDOR_MINIMO) avisos.unshift(`El servidor de esta planilla (Codigo.gs) está desactualizado (versión ${j.version || 1}, se necesita ${SERVIDOR_MINIMO}). Pegá el Codigo.gs nuevo en Apps Script y publicá "Nueva versión".`);
     S = {...S, productos: j.productos, ventas: j.ventas, metodos: j.metodos, negocio: j.negocio, avisos,
@@ -118,6 +119,20 @@ async function sync(silencioso) {
     if (!silencioso || !S.cargado) renderAll();
     if (!silencioso) toast(e.message, 'err');
   } finally { if (mi === syncSeq) $('#btnSync').classList.remove('girando'); }
+}
+
+// El servidor avisó que se mudó a otro link: se prueba el nuevo y, si responde, la app se pasa sola (sin tocar la compu).
+async function mudarse(nueva) {
+  const vieja = CFG.url;
+  try {
+    sessionStorage.setItem('stocklite_mudado', '1'); // evita vueltas infinitas si dos links se apuntan entre sí
+    CFG.url = nueva;
+    await api('cargar');
+    localStorage.setItem('stocklite_url', nueva);
+    localStorage.removeItem(CACHE_KEY); localStorage.removeItem('stocklite_ticket_v1'); // eran datos de la planilla anterior
+    location.reload();
+    await new Promise(() => {}); // la página se recarga: no seguir
+  } catch (e) { CFG.url = vieja; }
 }
 
 function estadoSync() {

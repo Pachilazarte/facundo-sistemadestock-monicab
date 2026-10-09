@@ -26,7 +26,7 @@ const COLS = {
   Movimientos: ['Fecha', 'ID Producto', 'Producto', 'Tipo', 'Cantidad', 'Stock final', 'Nota']
 };
 // Se sube cuando cambia algo que el HTML necesita (la app avisa si el servidor del cliente quedó atrás).
-const VERSION_SERVIDOR = 3;
+const VERSION_SERVIDOR = 4;
 const MONEDA = '$ #,##0.00', FECHA = 'dd/mm/yyyy hh:mm';
 // [columna inicial, cantidad de columnas, formato]
 const FORMATOS = {
@@ -47,6 +47,9 @@ function onOpen() {
     .addItem('Configurar / reparar sistema', 'configurarSistema')
     .addItem('Revisar datos', 'revisarDatosMenu')
     .addItem('Activar respaldo diario', 'activarRespaldoDiario')
+    .addSeparator()
+    .addItem('Mudar la app a otro link…', 'configurarRedireccion')
+    .addItem('Quitar la mudanza', 'quitarRedireccion')
     .addToUi();
 }
 
@@ -217,6 +220,24 @@ function reiniciarParaEntrega() {
   avisar_('Listo: todo en cero ✅\n\nAhora poné el nombre del negocio en la hoja Config (celda B2).');
 }
 
+// MUDANZA: si algún día este servidor se reemplaza por otro (otro link /exec), acá se carga el link NUEVO.
+// Las computadoras que sigan usando este link se pasan solas al nuevo la próxima vez que abran la app: nadie toca esas compus.
+// Importante: no borrar este servidor viejo (la implementación) mientras haya compus apuntando a él.
+function configurarRedireccion() {
+  const ui = SpreadsheetApp.getUi();
+  const r = ui.prompt('Mudar la app a otro link', 'Pegá el link NUEVO de la aplicación web (https://script.google.com/macros/s/.../exec).\nTodas las computadoras que usan este link se van a pasar solas al nuevo.', ui.ButtonSet.OK_CANCEL);
+  if (r.getSelectedButton() !== ui.Button.OK) return;
+  let u = r.getResponseText().trim();
+  if (u && u.indexOf('http') !== 0) u = 'https://script.google.com/macros/s/' + u + '/exec';
+  if (!/^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/.test(u)) { avisar_('Ese link no es válido. Tiene que empezar con https://script.google.com/macros/s/ y terminar en /exec'); return; }
+  PropertiesService.getScriptProperties().setProperty('REDIRECT_URL', u);
+  avisar_('Listo ✅\n\nLas computadoras que usan ESTE link se van a pasar solas al nuevo la próxima vez que abran la app.\nNo borres esta implementación todavía.');
+}
+function quitarRedireccion() {
+  PropertiesService.getScriptProperties().deleteProperty('REDIRECT_URL');
+  avisar_('Mudanza quitada. Este link vuelve a funcionar como siempre.');
+}
+
 function revisarDatosMenu() {
   const av = revisarDatos_(leerProductos_());
   avisar_(av.length ? 'Hay ' + av.length + ' cosas para revisar:\n\n• ' + av.join('\n• ') : 'Todo en orden ✅');
@@ -350,6 +371,7 @@ function cargarInterno_(puedeEscribir) {
     negocio: cfg_('Negocio', 'Mi Negocio'),
     porCobrar: r2_(porCobrar),
     version: VERSION_SERVIDOR,
+    redirect: PropertiesService.getScriptProperties().getProperty('REDIRECT_URL') || '',
     hora: fecha_(new Date(), tz)
   };
 }
