@@ -93,11 +93,11 @@ function renderGrid() {
   g.innerHTML = l.length ? ver.map(p => {
     const n = enCarro(p.codigo), agot = p.stock <= 0, bajo = !agot && p.stock <= p.minimo, malo = !!p.revisar;
     const est = malo ? `<span class="text-peligro">Revisar datos</span>` : agot ? `<span class="text-peligro">Agotado</span>` : bajo ? `<span class="text-aviso">Quedan ${num(p.stock)}</span>` : `<span class="text-suave">${num(p.stock)} en stock</span>`;
-    return `<button data-c="${esc(p.codigo)}" title="N° ${esc(p.codigo)}" class="relative text-left flex flex-col gap-1 rounded-2xl border bg-superficie p-3 hover:border-marca ${n ? 'border-marca' : 'border-borde'} ${agot || malo ? 'opacity-50' : ''}">
-      ${n ? `<span class="absolute -top-2 -right-2 grid place-items-center min-w-6 h-6 px-1.5 rounded-full bg-marca text-marca-sobre text-xs font-extrabold">${num(n)}</span>` : ''}
-      <span class="font-bold text-sm leading-snug line-clamp-2 min-h-[2.4em]">${esc(p.nombre)}</span>
-      <span class="text-lg font-extrabold num">${money(p.precio)}</span>
-      <span class="text-xs font-semibold">${est}</span></button>`;
+    return `<button data-c="${esc(p.codigo)}" title="N° ${esc(p.codigo)}" class="relative text-left flex flex-col gap-0.5 rounded-xl border bg-superficie px-2.5 py-2 hover:border-marca ${n ? 'border-marca' : 'border-borde'} ${agot || malo ? 'opacity-50' : ''}">
+      ${n ? `<span class="absolute -top-1.5 -right-1.5 grid place-items-center min-w-5 h-5 px-1 rounded-full bg-marca text-marca-sobre text-[11px] font-extrabold">${num(n)}</span>` : ''}
+      <span class="font-bold text-[13px] leading-tight line-clamp-2 min-h-[2.1em]">${esc(p.nombre)}</span>
+      <span class="text-base font-extrabold num leading-tight">${money(p.precio)}</span>
+      <span class="text-[11px] font-semibold leading-tight">${est}</span></button>`;
   }).join('') + (l.length > ver.length ? `<div class="col-span-full text-center py-2"><button class="btn btn-sm" data-mas>Mostrar más (${l.length - ver.length} restantes)</button></div>` : '')
     : `<div class="col-span-full text-center text-suave py-12">${ic('search-x', 'w-8 h-8 mx-auto mb-2')}Sin resultados para esa búsqueda</div>`;
 }
@@ -239,7 +239,7 @@ function renderMetodos() {
   if (!ms.includes(metodoSel)) metodoSel = ef;
   const enOtros = otros.includes(metodoSel);
   if (enOtros && !fiado) otrosAbierto = true;
-  const chip = (m) => `<button class="chip ${!fiado && m === metodoSel ? 'on' : ''}" data-metodo="${esc(m)}">${esc(m)}</button>`;
+  const chip = (m) => `<button class="chip ${!fiado && m === metodoSel ? 'on' : ''}" data-metodo="${esc(m)}" title="${esc(m)}">${m === 'Transferencia' ? 'Transf.' : esc(m)}</button>`; // "Transf." para que entren los 4 en una fila
   $('#metodos').innerHTML = fijos.map(chip).join('')
     + `<button class="chip ${fiado ? 'on' : ''}" data-fiado title="Queda debiendo: se anota a nombre de un cliente">Pendiente</button>`
     + (otros.length ? `<button class="chip ${!fiado && enOtros ? 'on' : ''}" data-otros aria-expanded="${otrosAbierto}">Otros</button>` : '');

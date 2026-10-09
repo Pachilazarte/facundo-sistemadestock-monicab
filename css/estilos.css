@@ -175,3 +175,8 @@ html.vg dialog { width: min(600px, 96vw); }
 .mini.on { opacity: 1; background: rgb(var(--c-lateral-activo) / .16); color: rgb(var(--c-lateral-activo)); }
 .mini svg { width: 1.05rem; height: 1.05rem; }
 html.vg .mini { width: 1.8rem; height: 1.8rem; }
+
+/* Vista grande en ventanas angostas: la botonera se achica antes de desbordarse */
+@media (max-width: 900px) { html.vg .nav-hint { display: none; } }
+@media (max-width: 700px) { html.vg #nav .nav-item:not(.on) .nav-lbl { display: none !important; } html.vg #syncTxt { display: none !important; } }
+html.vg #cartCount { display: none; }
