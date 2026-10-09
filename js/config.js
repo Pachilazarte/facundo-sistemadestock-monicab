@@ -7,5 +7,5 @@
  *   menú 🧾 Stock Lite > Clave de acceso (ver / crear). Sin la clave, el link solo no sirve para nada.
  *   La clave NO va acá: se carga una vez en cada equipo con el link de instalación  ...?k=CLAVE  */
 const CONEXION = {
-  url: ''
+  url: 'https://script.google.com/macros/s/AKfycbz8ufg5zFZiaqXTgqExWfbjiKaTAOsqfDTz5XktS9UboUPlkVWeVlkPCP-0RoTPnXtYuQ/exec'
 };
