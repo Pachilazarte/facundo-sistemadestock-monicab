@@ -26,7 +26,7 @@ const COLS = {
   Movimientos: ['Fecha', 'ID Producto', 'Producto', 'Tipo', 'Cantidad', 'Stock final', 'Nota']
 };
 // Se sube cuando cambia algo que el HTML necesita (la app avisa si el servidor del cliente quedó atrás).
-const VERSION_SERVIDOR = 6;
+const VERSION_SERVIDOR = 7;
 const MONEDA = '$ #,##0.00', FECHA = 'dd/mm/yyyy hh:mm';
 // [columna inicial, cantidad de columnas, formato]
 const FORMATOS = {
@@ -297,7 +297,7 @@ function doPost(e) {
 }
 
 function despachar_(req) {
-  const lecturas = { cargar: cargar_, detalleVenta: detalleVenta_, resumen: resumen_ };
+  const lecturas = { cargar: cargar_, detalleVenta: detalleVenta_, resumen: resumen_, historial: historial_ };
   const escrituras = {
     guardarProducto: guardarProducto_, ingresoStock: ingresoStock_, ajusteStock: ajusteStock_,
     registrarVenta: registrarVenta_, registrarPago: registrarPago_, anularVenta: anularVenta_, eliminarProducto: eliminarProducto_
@@ -491,8 +491,9 @@ function detalleVenta_(req) {
 }
 
 // Cálculo del resumen a partir de filas ya leídas (lo usan "cargar" para HOY y "resumen" para 7 días / mes).
-function resumenDe_(filasVentas, filasPagos, filasDetalle, desde) {
-  const enPeriodo = function (r) { return r[0] !== '' && r[1] instanceof Date && r[1].getTime() >= desde; };
+function resumenDe_(filasVentas, filasPagos, filasDetalle, desde, hasta) {
+  const tope = hasta || Infinity; // sin tope: hasta hoy
+  const enPeriodo = function (r) { return r[0] !== '' && r[1] instanceof Date && r[1].getTime() >= desde && r[1].getTime() < tope; };
   let total = 0, cantidad = 0;
   const validas = {};
   filasVentas.filter(enPeriodo).forEach(function (r) {
@@ -521,17 +522,59 @@ function resumenDe_(filasVentas, filasPagos, filasDetalle, desde) {
   };
 }
 
-// Resumen por período (hoy | semana | mes), leyendo solo lo necesario.
+// Resumen por período (hoy | semana | mes), o de un mes puntual (req.mes = 'AAAA-MM'), leyendo solo lo necesario.
 function resumen_(req) {
   const tz = ss_().getSpreadsheetTimeZone();
-  const periodo = ['hoy', 'semana', 'mes'].indexOf(req.periodo) >= 0 ? req.periodo : 'hoy';
-  const desde = inicioPeriodo_(tz, periodo);
+  let desde, hasta = 0, periodo;
+  if (/^\d{4}-\d{2}$/.test(String(req.mes || ''))) {
+    const a = Number(req.mes.slice(0, 4)), m = Number(req.mes.slice(5, 7));
+    desde = Utilities.parseDate(req.mes.replace('-', '') + '01', tz, 'yyyyMMdd').getTime();
+    const sig = m === 12 ? (a + 1) + '01' : a + ('0' + (m + 1)).slice(-2);
+    hasta = Utilities.parseDate(sig + '01', tz, 'yyyyMMdd').getTime();
+    periodo = req.mes;
+  } else {
+    periodo = ['hoy', 'semana', 'mes'].indexOf(req.periodo) >= 0 ? req.periodo : 'hoy';
+    desde = inicioPeriodo_(tz, periodo);
+  }
   const ventas = leerDesde_(hoja_('Ventas'), 8, desde, 0).filas;
   let minId = Infinity;
-  ventas.forEach(function (r) { const id = Number(r[0]); if (r[0] !== '' && String(r[6]) !== 'Anulada' && id < minId) minId = id; });
-  const r = resumenDe_(ventas, leerDesde_(hoja_('Pagos'), 7, desde, 0).filas, detalleDesdeId_(minId), desde);
+  ventas.forEach(function (r) {
+    const id = Number(r[0]), t = r[1] instanceof Date ? r[1].getTime() : 0;
+    if (r[0] !== '' && String(r[6]) !== 'Anulada' && id < minId && (!hasta || t < hasta)) minId = id;
+  });
+  const r = resumenDe_(ventas, leerDesde_(hoja_('Pagos'), 7, desde, 0).filas, detalleDesdeId_(minId), desde, hasta);
   r.periodo = periodo;
   return r;
+}
+
+// HISTORIAL: un renglón por mes (ventas, cobrado, ganancia), del más nuevo al más viejo. Últimos 36 meses.
+function historial_() {
+  const tz = ss_().getSpreadsheetTimeZone();
+  const mesDe = function (d) { return d instanceof Date ? Utilities.formatDate(d, tz, 'yyyyMMdd').slice(0, 6) : ''; };
+  const meses = {}, ventaMes = {};
+  const get = function (k) { return meses[k] || (meses[k] = { mes: k.slice(0, 4) + '-' + k.slice(4), ventas: 0, cantidad: 0, cobrado: 0, ganancia: 0 }); };
+  const hv = hoja_('Ventas'), nV = hv.getLastRow() - 1;
+  if (nV > 0) hv.getRange(2, 1, nV, 7).getValues().forEach(function (r) {
+    const k = mesDe(r[1]);
+    if (r[0] === '' || !k || String(r[6]) === 'Anulada') return;
+    const m = get(k); m.ventas += Number(r[3]) || 0; m.cantidad++; ventaMes[Number(r[0])] = k;
+  });
+  const hg = hoja_('Pagos'), nP = hg.getLastRow() - 1;
+  if (nP > 0) hg.getRange(2, 1, nP, 5).getValues().forEach(function (r) {
+    const k = mesDe(r[1]);
+    if (r[0] === '' || !k) return;
+    get(k).cobrado += Number(r[4]) || 0;
+  });
+  const hd = hoja_('Detalle'), nD = hd.getLastRow() - 1;
+  if (nD > 0) hd.getRange(2, 1, nD, 7).getValues().forEach(function (r) {
+    const k = ventaMes[Number(r[0])];
+    if (!k) return;
+    get(k).ganancia += (Number(r[5]) || 0) - (Number(r[6]) || 0) * (Number(r[3]) || 0);
+  });
+  const lista = Object.keys(meses).sort().reverse().slice(0, 36).map(function (k) {
+    const m = meses[k]; m.ventas = r2_(m.ventas); m.cobrado = r2_(m.cobrado); m.ganancia = r2_(m.ganancia); return m;
+  });
+  return { meses: lista };
 }
 
 /* ========================= ESCRITURAS ========================= */

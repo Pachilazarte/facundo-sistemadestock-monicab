@@ -551,7 +551,7 @@ async function cargarResumen(forzar) {
   const mi = ++resSeq;
   renderResumen(); // muestra "calculando" mientras llega
   try {
-    const r = await api('resumen', {periodo: periodoSel});
+    const r = await api(periodoSel === 'hist' ? 'historial' : 'resumen', /^\d{4}-\d{2}$/.test(periodoSel) ? {mes: periodoSel} : {periodo: periodoSel});
     if (mi !== resSeq) return;
     resCache[periodoSel] = {ts: Date.now(), r};
     if (periodoSel === 'hoy') { S.hoy = r; S.hoySucio = false; guardarCache(); }
@@ -562,10 +562,31 @@ $('#periodos').addEventListener('click', e => {
   const b = e.target.closest('[data-p]'); if (!b) return;
   periodoSel = b.dataset.p; $$('#periodos .chip').forEach(x => x.classList.toggle('on', x === b)); cargarResumen();
 });
+const esMes = p => /^\d{4}-\d{2}$/.test(p);
+const nombreMes = k => { const [a, m] = k.split('-'); const t = new Date(Number(a), Number(m) - 1, 1).toLocaleDateString('es-AR', {month: 'long', year: 'numeric'}); return t.charAt(0).toUpperCase() + t.slice(1); };
+$('#histoVolver').addEventListener('click', () => { periodoSel = 'hist'; cargarResumen(); });
+$('#histo').addEventListener('click', e => { const tr = e.target.closest('tr[data-m]'); if (tr) { periodoSel = tr.dataset.m; cargarResumen(); } });
+
+function renderHistorial() {
+  const r = datosResumen(), el = $('#histo');
+  if ((S.version || 1) < 7) { el.innerHTML = `<div class="panel bg-superficie border border-borde rounded-2xl p-5">${vacioMsg('triangle-alert', 'Para ver el historial hay que actualizar el servidor (Codigo.gs, versión 7).')}</div>`; return; }
+  if (!r) { el.innerHTML = '<div class="text-center text-suave py-6">Calculando…</div>'; return; }
+  const tot = r.meses.reduce((a, m) => ({v: a.v + m.ventas, c: a.c + m.cobrado, g: a.g + m.ganancia, n: a.n + m.cantidad}), {v: 0, c: 0, g: 0, n: 0});
+  el.innerHTML = `<div class="bg-superficie border border-borde rounded-2xl overflow-x-auto"><table class="tabla w-full">
+    <thead><tr><th>Mes</th><th class="r">Ventas</th><th class="r">Cantidad</th><th class="r">Cobrado</th><th class="r">Ganancia</th><th></th></tr></thead><tbody>
+    ${r.meses.length ? r.meses.map(m => `<tr class="fila-click" tabindex="0" data-m="${m.mes}"><td class="font-bold">${nombreMes(m.mes)}</td><td class="r num font-bold">${money(m.ventas)}</td><td class="r num text-suave">${m.cantidad}</td><td class="r num">${money(m.cobrado)}</td><td class="r num text-ok font-bold">${money(m.ganancia)}</td><td class="text-suave">${ic('chevron-right', 'w-4 h-4')}</td></tr>`).join('')
+      + `<tr class="bg-hundido/60"><td class="font-extrabold">Total</td><td class="r num font-extrabold">${money(tot.v)}</td><td class="r num font-bold">${tot.n}</td><td class="r num font-bold">${money(tot.c)}</td><td class="r num font-extrabold text-ok">${money(tot.g)}</td><td></td></tr>`
+      : `<tr><td colspan="6">${vacioMsg('receipt', 'Todavía no hay ventas para mostrar.')}</td></tr>`}</tbody></table></div>`;
+}
 
 function renderResumen() {
+  const hist = periodoSel === 'hist';
+  $('#histo').hidden = !hist; $('#resDetalle').hidden = hist; $('#histoVolver').hidden = !esMes(periodoSel);
+  $$('#periodos .chip').forEach(x => x.classList.toggle('on', x.dataset.p === (esMes(periodoSel) ? 'hist' : periodoSel)));
+  if (hist) return renderHistorial();
   const r = datosResumen();
   const cargando = `<div class="col-span-full text-center text-suave py-6">Calculando…</div>`;
+  if (esMes(periodoSel)) $('#histoVolver').textContent = '← Todos los meses · ' + nombreMes(periodoSel);
   $('#kpis').innerHTML = r ? [
     kpi('shopping-bag', 'Ventas', money(r.ventas), 'bg-marca-claro text-marca', `${r.cantidad} ${r.cantidad === 1 ? 'venta' : 'ventas'}`),
     kpi('banknote', 'Cobrado (neto)', money(r.cobrado), 'bg-ok-claro text-ok', 'Incluye cobros de deudas viejas'),

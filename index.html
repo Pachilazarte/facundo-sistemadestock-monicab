@@ -174,8 +174,12 @@
           <button class="chip on" data-p="hoy">Hoy</button>
           <button class="chip" data-p="semana">7 días</button>
           <button class="chip" data-p="mes">Este mes</button>
+          <button class="chip" data-p="hist">Historial</button>
         </div>
       </div>
+      <div id="histo" hidden></div>
+      <div id="resDetalle">
+      <button id="histoVolver" hidden class="btn btn-sm mb-3">&larr; Todos los meses</button>
       <div id="kpis" class="grid grid-cols-[repeat(auto-fit,minmax(170px,1fr))] gap-4 mb-4"></div>
       <div id="kpis2" class="grid grid-cols-[repeat(auto-fit,minmax(170px,1fr))] gap-4 mb-5"></div>
       <div class="grid lg:grid-cols-2 gap-4 mb-4">
@@ -191,6 +195,7 @@
       <div class="panel bg-superficie border border-borde rounded-2xl p-5">
         <h3 class="font-extrabold flex items-center gap-2 mb-2"><svg class="i w-5 h-5 text-aviso" aria-hidden="true"><use href="#i-triangle-alert"/></svg>Stock bajo o agotado</h3>
         <div id="bajo" class="max-h-80 overflow-y-auto"></div>
+      </div>
       </div>
     </section>
     </div>

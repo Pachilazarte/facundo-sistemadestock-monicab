@@ -60,8 +60,14 @@ Sistema liviano de **stock + ventas + cobros** sobre Google Sheets, operado por 
 | 4 | **Mudanza** (`redirect`): la planilla vieja avisa el link nuevo |
 | 5 | **Cola sin internet**: acción `lote`, fecha real (`ts`), registro durable de `rid`, acepta lo ya vendido aunque deje stock negativo |
 | 6 | **Clave de acceso**: sin la clave (`k`) el servidor rechaza todo |
+| 7 | **Historial**: acción `historial` (un renglón por mes, 36 meses) y `resumen` con `mes: 'AAAA-MM'` |
 
 La app degrada bien con servidores viejos (sin borrar productos, sin cola) y avisa que hay que actualizar el `Codigo.gs`.
+
+## 4b. Actualización automática de la app (`js/pwa.js`)
+Al detectar una `APP_VERSION` nueva (20 s después de abrir, cada hora y al volver a la ventana) la app se recarga **sola** cuando está libre:
+ticket vacío, sin ventanas abiertas y sin escribir. Si está vendiendo, reintenta cada 30 s. Máximo 2 recargas automáticas por versión
+(evita bucles si el navegador no toma la nueva); después muestra el cartel verde para tocar a mano. El ticket y la cola sin internet sobreviven al recargar.
 
 ## 5. Cola sin internet (`js/cola.js`)
 
