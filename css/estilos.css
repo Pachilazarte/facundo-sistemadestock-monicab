@@ -180,3 +180,8 @@ html.vg .mini { width: 1.8rem; height: 1.8rem; }
 @media (max-width: 900px) { html.vg .nav-hint { display: none; } }
 @media (max-width: 700px) { html.vg #nav .nav-item:not(.on) .nav-lbl { display: none !important; } html.vg #syncTxt { display: none !important; } }
 html.vg #cartCount { display: none; }
+
+/* Las opciones de pago van siempre en UNA fila: se reparten el ancho y se achican antes de saltar de línea */
+#metodos { flex-wrap: nowrap; gap: .3rem; }
+#metodos .chip { flex: 1 1 auto; min-width: 0; justify-content: center; padding: .35rem .4rem; font-size: .78rem; }
+#metodosOtros .chip { flex: 1 1 auto; justify-content: center; }
