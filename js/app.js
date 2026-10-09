@@ -290,15 +290,18 @@ $('#btnCobrar').addEventListener('click', async () => {
   if (fiado && !cliente) { $('#cliente').focus(); return toast('Elegí o escribí el nombre del cliente que queda debiendo', 'err'); }
   const previo = cliente && S.ventas.find(x => plain(x.cliente) === plain(cliente)); // si ya existe, se usa tal cual está escrito en la planilla
   if (previo) cliente = previo.cliente;
-  const payload = {cliente, metodo: metodoSel, pagoMonto: monto, items: cart.map(l => ({codigo: l.codigo, cantidad: l.cantidad, precio: l.precio}))};
+  const payload = {cliente, metodo: metodoSel, pagoMonto: monto, items: cart.map(l => ({codigo: l.codigo, cantidad: l.cantidad, precio: l.precio, nombre: l.nombre}))};
   const lineas = cart.map(l => [l.codigo, l.nombre, l.cantidad, l.precio, r2(l.cantidad * l.precio)]); // para mostrar el detalle sin pedirlo
   b.disabled = true; $('span', b).textContent = 'Guardando…';
   try {
-    const r = await api('registrarVenta', payload, ridDe(cartNonce, payload));
-    S.productos.forEach(p => { if (r.stock[p.codigo] !== undefined) p.stock = r.stock[p.codigo]; });
-    r.venta.items = lineas; S.ventas.unshift(r.venta);
-    toast(`Venta #${r.id} guardada en la planilla · ${money(r.total)}${r.saldo > 0 ? ' · debe ' + money(r.saldo) : ''}`, 'ok');
-    if (r.advertencia) toast(r.advertencia, 'err');
+    const o = await ejecutar('registrarVenta', payload, ridDe(cartNonce, payload), {lineas, resumen: `${cliente || 'Mostrador'} · ${money(total)}`});
+    if (o.confirmada) {
+      const r = o.r;
+      S.productos.forEach(p => { if (r.stock[p.codigo] !== undefined) p.stock = r.stock[p.codigo]; });
+      r.venta.items = lineas; S.ventas.unshift(r.venta);
+      toast(`Venta #${r.id} guardada en la planilla · ${money(r.total)}${r.saldo > 0 ? ' · debe ' + money(r.saldo) : ''}`, 'ok');
+      if (r.advertencia) toast(r.advertencia, 'err');
+    } else toast(`Venta guardada en esta computadora · ${money(total)}. No se pudo subir ahora: se sube sola cuando haya internet.`, 'ok');
     tras(); vaciarTicket(); actualizarBadge(); $('#q').focus();
   } catch (e) { toast(e.message, 'err'); b.disabled = false; }
   finally { $('span', b).textContent = 'Cobrar'; b.disabled = !cart.length; }
@@ -403,8 +406,9 @@ function modalIngreso(codigo) {
       const costo = v(d, 'costo').trim() === '' ? undefined : parseNum(v(d, 'costo'));
       if (costo !== undefined && isNaN(costo)) throw new Error('El costo no es válido.');
       const payload = {codigo: p.codigo, cantidad, costo, nota: v(d, 'nota')};
-      const r = await api('ingresoStock', payload, ridDe(nonce, payload));
-      toast(`${r.producto.nombre}: ahora hay ${num(r.producto.stock)} (guardado en la planilla)`, 'ok'); aplicarProducto(r);
+      const o = await ejecutar('ingresoStock', payload, ridDe(nonce, payload), {resumen: `${p.nombre} +${num(cantidad)}`});
+      if (o.confirmada) { toast(`${o.r.producto.nombre}: ahora hay ${num(o.r.producto.stock)} (guardado en la planilla)`, 'ok'); aplicarProducto(o.r); }
+      else { toast(`${p.nombre}: ingreso guardado en esta computadora, se sube solo cuando haya internet`, 'ok'); tras(); renderVista(); }
     }});
 }
 function modalAjuste(codigo) {
@@ -416,8 +420,9 @@ function modalAjuste(codigo) {
     onOk: async d => {
       const n = parseNum(v(d, 'n')); if (isNaN(n) || n < 0) throw new Error('Poné un stock válido (0 o más).');
       const payload = {codigo, nuevoStock: n, nota: v(d, 'nota') || 'Ajuste manual'};
-      const r = await api('ajusteStock', payload, ridDe(nonce, payload));
-      toast('Stock ajustado y guardado en la planilla', 'ok'); aplicarProducto(r);
+      const o = await ejecutar('ajusteStock', payload, ridDe(nonce, payload), {resumen: `${p.nombre} → ${num(n)}`});
+      if (o.confirmada) { toast('Stock ajustado y guardado en la planilla', 'ok'); aplicarProducto(o.r); }
+      else { toast('Ajuste guardado en esta computadora, se sube solo cuando haya internet', 'ok'); tras(); renderVista(); }
     }});
 }
 
@@ -433,7 +438,7 @@ function renderCobros() {
     const dias = diasDesde(x.fecha);
     return `<tr>
       <td><div class="flex items-center gap-3 cursor-pointer rounded" tabindex="0" data-pay="${x.id}"><span class="grid place-items-center w-9 h-9 rounded-full bg-marca-claro text-marca text-xs font-extrabold shrink-0">${esc(iniciales(x.cliente))}</span><b>${esc(x.cliente)}</b></div></td>
-      <td><span class="font-bold">#${x.id}</span><div class="text-xs ${dias > 7 ? 'text-aviso font-bold' : 'text-suave'}">${hace(dias)}</div></td>
+      <td><span class="font-bold">${x.pendiente ? 'Sin subir' : '#' + x.id}</span><div class="text-xs ${dias > 7 ? 'text-aviso font-bold' : 'text-suave'}">${hace(dias)}</div></td>
       <td class="r num">${money(x.total)}</td><td class="r num text-suave">${money(x.pagado)}</td>
       <td class="r num font-extrabold text-peligro">${money(x.saldo)}</td>
       <td class="r"><button class="btn btn-sm btn-marca" data-pay="${x.id}">${ic('wallet', 'w-3.5 h-3.5')}Cobrar</button></td></tr>`;
@@ -444,6 +449,8 @@ $('#cobrosBody').addEventListener('click', e => { const b = e.target.closest('[d
 
 function modalPago(id) {
   const x = S.ventas.find(s => s.id === id), nonce = uid();
+  if (!x) return;
+  if (x.pendiente) return toast('Esa venta todavía no se subió a la planilla. Cuando suba (apenas haya internet) vas a poder cobrarle el saldo.', 'err');
   modal({titulo: `Cobrar venta #${id}`, icono: 'wallet', ok: 'Registrar cobro', body: `
     <p class="text-sm text-suave">${esc(x.cliente)} · total ${money(x.total)} · pagado ${money(x.pagado)}</p>
     <p class="mt-1">Debe <b class="text-peligro text-xl num">${money(x.saldo)}</b></p>
@@ -454,9 +461,12 @@ function modalPago(id) {
       const monto = parseNum(v(d, 'monto')); if (isNaN(monto) || monto <= 0) throw new Error('Poné un monto mayor a 0.');
       if (monto > x.saldo + 0.001) throw new Error('El monto supera lo que debe (' + money(x.saldo) + ').');
       const payload = {idVenta: id, monto, metodo: v(d, 'metodo'), nota: v(d, 'nota')};
-      const r = await api('registrarPago', payload, ridDe(nonce, payload));
-      Object.assign(x, {pagado: r.pagado, saldo: r.saldo, estado: r.estado});
-      toast(r.saldo > 0.009 ? `Cobro guardado en la planilla · todavía debe ${money(r.saldo)}` : 'Venta saldada y guardada en la planilla', 'ok');
+      const o = await ejecutar('registrarPago', payload, ridDe(nonce, payload), {resumen: `Venta #${id} · ${x.cliente} · ${money(monto)}`});
+      if (o.confirmada) {
+        const r = o.r;
+        Object.assign(x, {pagado: r.pagado, saldo: r.saldo, estado: r.estado});
+        toast(r.saldo > 0.009 ? `Cobro guardado en la planilla · todavía debe ${money(r.saldo)}` : 'Venta saldada y guardada en la planilla', 'ok');
+      } else toast('Cobro guardado en esta computadora, se sube solo cuando haya internet', 'ok');
       tras(); actualizarBadge(); renderVista();
     }});
 }
@@ -469,9 +479,9 @@ function renderVentas() {
   const q = plain($('#qv').value.trim());
   const l = S.ventas.filter(x => !q || plain(x.cliente).includes(q) || String(x.id) === q).slice(0, LIM_VENTAS);
   $('#ventasBody').innerHTML = l.length ? l.map(x => `<tr class="fila-click" tabindex="0" data-v="${x.id}">
-      <td class="font-bold">#${x.id}</td><td class="text-suave whitespace-nowrap">${fdateCorta(x.fecha)}</td><td class="whitespace-nowrap">${esc(x.cliente)}</td>
+      <td class="font-bold">${x.pendiente ? '<span class="text-aviso text-xs">Sin subir</span>' : '#' + x.id}</td><td class="text-suave whitespace-nowrap">${fdateCorta(x.fecha)}</td><td class="whitespace-nowrap">${esc(x.cliente)}</td>
       <td class="text-suave text-sm max-w-[13rem] truncate">${x.items ? esc(compro(x)) : '<span class="text-marca font-bold">Ver detalle</span>'}</td>
-      <td class="r num font-bold">${money(x.total)}</td><td class="r num ${x.saldo > 0.009 ? 'text-peligro font-bold' : 'text-suave'}">${x.saldo > 0.009 ? money(x.saldo) : '—'}</td><td>${badge(x.estado)}</td>
+      <td class="r num font-bold">${money(x.total)}</td><td class="r num ${x.saldo > 0.009 ? 'text-peligro font-bold' : 'text-suave'}">${x.saldo > 0.009 ? money(x.saldo) : '—'}</td><td>${x.pendiente ? '<span class="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-bold bg-aviso-claro text-aviso">' + ic('clock', 'w-3 h-3') + 'Sin subir</span>' : badge(x.estado)}</td>
       <td class="text-suave">${ic('chevron-right', 'w-4 h-4')}</td></tr>`).join('')
     : `<tr><td colspan="8"><div class="text-center text-suave py-10">${ic('receipt', 'w-9 h-9 mx-auto mb-2')}<p class="font-bold text-texto">${q ? 'Sin resultados' : 'Todavía no hay ventas'}</p><p class="text-sm">${q ? 'Probá con otro nombre o número.' : 'Las ventas que hagas van a aparecer acá.'}</p></div></td></tr>`;
 }
@@ -482,7 +492,7 @@ $('#ventasBody').addEventListener('click', e => { const tr = e.target.closest('t
 function abrirVenta(id) {
   const x = S.ventas.find(s => s.id === id); if (!x) return;
   const local = x.items?.length ? x.items.map(i => ({codigo: i[0], nombre: i[1], cantidad: i[2], precio: i[3], subtotal: i[4]})) : null;
-  const d = modal({titulo: `Venta #${id} · ${x.cliente}`, icono: 'receipt', cancel: 'Cerrar', body: '<div data-det></div>'});
+  const d = modal({titulo: x.pendiente ? `Venta sin subir · ${x.cliente}` : `Venta #${id} · ${x.cliente}`, icono: 'receipt', cancel: 'Cerrar', body: '<div data-det></div>'});
   const det = $('[data-det]', d);
   const pintar = (items, pagos, error) => {
     det.innerHTML = `
@@ -495,13 +505,14 @@ function abrirVenta(id) {
       </div>
       <h4 class="font-extrabold mt-3 mb-1.5 flex items-center gap-2 text-sm">${ic('banknote', 'w-4 h-4 text-marca')}Pagos</h4>
       ${pagos ? (pagos.length ? `<div class="rounded-xl border border-borde divide-y divide-borde/70">${pagos.map(p => `<div class="flex justify-between gap-3 px-3 py-2"><div><div class="font-bold">${esc(p.metodo)}</div><div class="text-xs text-suave">${fdate(p.fecha)}${p.nota ? ' · ' + esc(p.nota) : ''}</div></div><div class="font-bold num ${p.monto < 0 ? 'text-peligro' : ''}">${money(p.monto)}</div></div>`).join('')}</div>` : '<p class="text-sm text-suave">Sin pagos registrados.</p>') : '<p class="text-sm text-suave">Cargando pagos…</p>'}
-      ${x.estado !== 'Anulada' ? `<div class="flex gap-2 mt-3">${x.saldo > 0.009 ? `<button type="button" class="btn btn-marca" data-p>${ic('wallet', 'w-4 h-4')}Cobrar saldo (${money(x.saldo)})</button>` : ''}<button type="button" class="btn btn-peligro" data-an>${ic('ban', 'w-4 h-4')}Anular venta</button></div>` : ''}`;
+      ${x.estado !== 'Anulada' && !x.pendiente ? `<div class="flex gap-2 mt-3">${x.saldo > 0.009 ? `<button type="button" class="btn btn-marca" data-p>${ic('wallet', 'w-4 h-4')}Cobrar saldo (${money(x.saldo)})</button>` : ''}<button type="button" class="btn btn-peligro" data-an>${ic('ban', 'w-4 h-4')}Anular venta</button></div>` : ''}`;
   };
   det.addEventListener('click', e => {
     if (e.target.closest('[data-p]')) { d.close(); modalPago(id); }
     else if (e.target.closest('[data-an]')) { d.close(); modalAnular(id); }
   });
   pintar(local, null);
+  if (x.pendiente) return pintar(local, []);
   api('detalleVenta', {idVenta: id})
     .then(r => pintar(local || r.items, r.pagos))
     .catch(err => pintar(local, [], local ? '' : err.message));
@@ -509,6 +520,7 @@ function abrirVenta(id) {
 
 function modalAnular(id) {
   const nonce = uid();
+  if (id < 0) return toast('Esa venta todavía no se subió a la planilla. Anulala cuando suba (apenas haya internet).', 'err');
   modal({titulo: `Anular venta #${id}`, icono: 'ban', ok: 'Sí, anular', okIcono: 'ban', peligro: true, body: `
     <p class="text-sm">Se <b>devuelve el stock</b> y se registra la devolución del dinero cobrado. <b class="text-peligro">No se puede deshacer.</b></p>
     <label class="etiqueta">Motivo</label><input name="nota" class="campo">`,
@@ -627,4 +639,5 @@ function pedirLink() {
 $('#ver').textContent = 'Versión ' + APP_VERSION;
 if (cargarCache()) $('#syncTxt').textContent = 'Datos de ' + horaCorta(S.ts) + ' · actualizando…';
 renderAll();
+colaLista.then(() => { reaplicarFaltantes(); actualizarAvisoCola(); renderVista(); }); // lo guardado sin internet reaparece al abrir
 if (CFG.url) sync(true); else pedirLink();

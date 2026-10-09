@@ -26,7 +26,7 @@ const COLS = {
   Movimientos: ['Fecha', 'ID Producto', 'Producto', 'Tipo', 'Cantidad', 'Stock final', 'Nota']
 };
 // Se sube cuando cambia algo que el HTML necesita (la app avisa si el servidor del cliente quedó atrás).
-const VERSION_SERVIDOR = 4;
+const VERSION_SERVIDOR = 5;
 const MONEDA = '$ #,##0.00', FECHA = 'dd/mm/yyyy hh:mm';
 // [columna inicial, cantidad de columnas, formato]
 const FORMATOS = {
@@ -279,6 +279,7 @@ function despachar_(req) {
     guardarProducto: guardarProducto_, ingresoStock: ingresoStock_, ajusteStock: ajusteStock_,
     registrarVenta: registrarVenta_, registrarPago: registrarPago_, anularVenta: anularVenta_, eliminarProducto: eliminarProducto_
   };
+  if (req.action === 'lote') return lote_(req);
   if (lecturas[req.action]) { const o = lecturas[req.action](req); o.ok = true; return o; }
   if (escrituras[req.action]) return escribir_(escrituras[req.action], req);
   throw new Error('Acción desconocida: ' + req.action);
@@ -288,19 +289,98 @@ function escribir_(fn, req) {
   const lock = LockService.getScriptLock();
   if (!lock.tryLock(25000)) throw new Error('El sistema está ocupado, probá de nuevo en unos segundos.');
   try {
-    const cache = CacheService.getScriptCache();
-    if (req.rid) {
-      const previo = cache.get('rid_' + req.rid);
-      if (previo) return JSON.parse(previo);
-    }
-    const out = fn(req);
-    out.ok = true;
-    if (req.rid) cache.put('rid_' + req.rid, JSON.stringify(out), 21600);
+    const out = ejecutarEscritura_(fn, req);
     SpreadsheetApp.flush();
     return out;
   } finally {
     lock.releaseLock();
   }
+}
+
+// Ejecuta UNA escritura (el candado ya está tomado). Cada operación lleva un "rid": si llega de nuevo (reintento por un corte,
+// aunque sea días después) NO se repite: se devuelve lo que ya se había hecho. Se recuerda en caché (rápido) y en la hoja
+// oculta "Operaciones" (permanente: la caché se olvida a las 6 horas, y una venta guardada sin internet puede reintentarse días después).
+function ejecutarEscritura_(fn, req) {
+  const cache = CacheService.getScriptCache();
+  if (req.rid) {
+    const previo = cache.get('rid_' + req.rid);
+    if (previo) return JSON.parse(previo);
+    const dur = opPrevia_(req.rid);
+    if (dur) { cache.put('rid_' + req.rid, JSON.stringify(dur), 21600); return dur; }
+  }
+  const out = fn(req);
+  out.ok = true;
+  if (req.rid) {
+    cache.put('rid_' + req.rid, JSON.stringify(out), 21600);
+    try { opGuardar_(req.rid, req.action, out); } catch (e) { /* la operación ya se hizo: nunca devolver error por esto */ }
+  }
+  return out;
+}
+
+const OPS_REVISAR = 3000; // cuántas operaciones recientes se miran para detectar un reintento
+function opsHoja_() {
+  const ss = ss_();
+  let h = ss.getSheetByName('Operaciones');
+  if (!h) {
+    h = ss.insertSheet('Operaciones');
+    h.getRange(1, 1, 1, 4).setValues([['RID', 'Fecha', 'Acción', 'Resultado']]);
+    h.getRange(1, 1, 20000, 1).setNumberFormat('@'); // texto: que un rid como "1e5" no se convierta en número
+    h.setFrozenRows(1);
+    h.hideSheet();
+  }
+  return h;
+}
+function opPrevia_(rid) {
+  const h = ss_().getSheetByName('Operaciones');
+  if (!h) return null;
+  const n = h.getLastRow() - 1;
+  if (n < 1) return null;
+  const cant = Math.min(n, OPS_REVISAR), ini = n - cant + 2;
+  const rids = h.getRange(ini, 1, cant, 1).getValues();
+  for (let i = rids.length - 1; i >= 0; i--) {
+    if (String(rids[i][0]) === rid) {
+      try { return JSON.parse(String(h.getRange(ini + i, 4).getValue())); } catch (e) { return { ok: true, repetida: true }; }
+    }
+  }
+  return null;
+}
+function opGuardar_(rid, accion, out) {
+  const h = opsHoja_();
+  h.getRange(h.getLastRow() + 1, 1, 1, 4).setValues([[String(rid), new Date(), accion, JSON.stringify(out).slice(0, 40000)]]);
+}
+
+// Fecha de una operación guardada sin internet: la hora REAL en que se hizo (no la de cuando se subió).
+// Solo se acepta si es razonable (hasta 60 días atrás, y no del futuro): si el reloj de la compu estaba mal, se usa la hora actual.
+function tsOp_(req) {
+  const t = Number(req.ts), ahora = Date.now();
+  return (t && t > ahora - 60 * 864e5 && t < ahora + 36e5) ? new Date(t) : new Date();
+}
+
+// Varias operaciones guardadas sin internet, de una sola vez (un solo pedido, un solo candado). Cada una es independiente:
+// si una falla, las demás igual se procesan y se informa cuál falló. Solo las operaciones que pueden hacerse sin conexión.
+function lote_(req) {
+  const ops = req.ops;
+  if (!Array.isArray(ops) || !ops.length) throw new Error('Lote vacío.');
+  if (ops.length > 25) throw new Error('Lote demasiado grande (máximo 25).');
+  const permitidas = { registrarVenta: registrarVenta_, registrarPago: registrarPago_, ingresoStock: ingresoStock_, ajusteStock: ajusteStock_ };
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(40000)) throw new Error('El sistema está ocupado, probá de nuevo en unos segundos.');
+  const results = [];
+  try {
+    ops.forEach(function (op) {
+      try {
+        const fn = permitidas[op.action];
+        if (!fn) throw new Error('Acción no permitida en lote: ' + op.action);
+        if (!op.rid) throw new Error('Falta el identificador de la operación.');
+        op.offline = true;
+        results.push({ rid: op.rid, ok: true, r: ejecutarEscritura_(fn, op) });
+      } catch (e) {
+        results.push({ rid: op && op.rid, ok: false, error: e.message || String(e) });
+      }
+    });
+    SpreadsheetApp.flush();
+  } finally { lock.releaseLock(); }
+  return { ok: true, results: results };
 }
 
 /* ========================= LECTURAS ========================= */
@@ -485,7 +565,7 @@ function ingresoStock_(req) {
     hp.getRange(p.fila, 4).setValue(costo);
     p.obj.costo = costo;
   }
-  agregar_(hoja_('Movimientos'), [[new Date(), Number(p.obj.codigo) || p.obj.codigo, p.obj.nombre, 'Ingreso', cant, nuevo, String(req.nota || '')]]);
+  agregar_(hoja_('Movimientos'), [[tsOp_(req), Number(p.obj.codigo) || p.obj.codigo, p.obj.nombre, 'Ingreso', cant, nuevo, String(req.nota || '')]]);
   return { producto: p.obj };
 }
 
@@ -496,7 +576,7 @@ function ajusteStock_(req) {
   const dif = r3_(nuevo - p.obj.stock);
   hoja_('Productos').getRange(p.fila, 6).setValue(nuevo);
   p.obj.stock = nuevo;
-  agregar_(hoja_('Movimientos'), [[new Date(), Number(p.obj.codigo) || p.obj.codigo, p.obj.nombre, 'Ajuste', dif, nuevo, String(req.nota || 'Ajuste manual')]]);
+  agregar_(hoja_('Movimientos'), [[tsOp_(req), Number(p.obj.codigo) || p.obj.codigo, p.obj.nombre, 'Ajuste', dif, nuevo, String(req.nota || 'Ajuste manual')]]);
   return { producto: p.obj };
 }
 
@@ -519,16 +599,23 @@ function registrarVenta_(req) {
   const idx = {};
   prods.forEach(function (p, i) { idx[p.obj.codigo] = i; });
 
-  const ahora = new Date();
-  const demanda = {}, lineas = [];
+  const ahora = tsOp_(req), off = req.offline === true; // off = viene de la cola sin internet: la venta YA ocurrió, no se rechaza
+  const demanda = {}, lineas = [], negativos = [];
   let total = 0;
 
   items.forEach(function (it) {
     const c = norm_(it.codigo), i = idx[c];
-    if (i === undefined) throw new Error('Producto inexistente (ID ' + c + '). Actualizá el sistema.');
+    if (i === undefined) {
+      if (!off) throw new Error('Producto inexistente (ID ' + c + '). Actualizá el sistema.');
+      const cantX = num_(it.cantidad, 'Cantidad'), precioX = num_(it.precio, 'Precio'), subX = r2_(cantX * precioX);
+      total += subX; // producto borrado mientras no había internet: la venta se registra igual, sin tocar stock
+      lineas.push([Number(c) || c, String(it.nombre || '(producto eliminado)'), cantX, precioX, subX, 0]);
+      negativos.push('"' + String(it.nombre || c) + '" ya no existe en la planilla');
+      return;
+    }
     const p = prods[i].obj;
-    if (!p.activo) throw new Error(p.nombre + ' está inactivo.');
-    if (p.revisar) throw new Error('"' + p.nombre + '" tiene datos inválidos en la planilla (' + p.revisar + '). Corregilo antes de venderlo.');
+    if (!p.activo && !off) throw new Error(p.nombre + ' está inactivo.');
+    if (p.revisar && !off) throw new Error('"' + p.nombre + '" tiene datos inválidos en la planilla (' + p.revisar + '). Corregilo antes de venderlo.');
     const cant = num_(it.cantidad, 'Cantidad');
     if (cant <= 0) throw new Error('Cantidad inválida en ' + p.nombre + '.');
     const precio = (it.precio === undefined || it.precio === null || it.precio === '') ? p.precio : num_(it.precio, 'Precio');
@@ -542,7 +629,10 @@ function registrarVenta_(req) {
 
   Object.keys(demanda).forEach(function (c) {
     const o = prods[idx[c]].obj;
-    if (demanda[c] > o.stock + 1e-9) throw new Error('Stock insuficiente de ' + o.nombre + ' (hay ' + o.stock + ').');
+    if (demanda[c] > o.stock + 1e-9) {
+      if (!off) throw new Error('Stock insuficiente de ' + o.nombre + ' (hay ' + o.stock + ').');
+      negativos.push('"' + o.nombre + '" quedó con stock negativo (había ' + o.stock + ', se vendieron ' + demanda[c] + ')');
+    }
   });
 
   const pago = r2_(num_(req.pagoMonto || 0, 'Pago'));
@@ -564,7 +654,7 @@ function registrarVenta_(req) {
 
   // 2) Stock y movimientos. Si algo falla acá NO se devuelve error (el cliente reintentaría y duplicaría la venta).
   const stockNuevo = {};
-  let advertencia = '';
+  let advertencia = negativos.length ? 'Venta #' + id + ': revisá el stock → ' + negativos.join('; ') + '.' : '';
   try {
     const cambios = {}, movs = [];
     Object.keys(demanda).forEach(function (c) {
@@ -576,7 +666,7 @@ function registrarVenta_(req) {
     escribirStock_(hoja_('Productos'), cambios);
     agregar_(hoja_('Movimientos'), movs);
   } catch (e) {
-    advertencia = 'La venta #' + id + ' se guardó, pero no se pudo actualizar el stock (' + e.message + '). Corregilo con "Ajustar".';
+    advertencia += ' La venta #' + id + ' se guardó, pero no se pudo actualizar el stock (' + e.message + '). Corregilo con "Ajustar".';
   }
 
   return {
@@ -600,7 +690,7 @@ function registrarPago_(req) {
   const nuevoPagado = r2_(pagado + monto), nuevoSaldo = r2_(total - nuevoPagado), estado = estado_(total, nuevoPagado);
   const hg = hoja_('Pagos');
   // Primero el pago (queda el rastro del dinero), después el saldo de la venta.
-  agregar_(hg, [[siguiente_('SEQ_PAGO', ultimoId_(hg)), new Date(), id, String(r[2]), monto, String(req.metodo || 'Efectivo'), String(req.nota || 'Cobro')]]);
+  agregar_(hg, [[siguiente_('SEQ_PAGO', ultimoId_(hg)), tsOp_(req), id, String(r[2]), monto, String(req.metodo || 'Efectivo'), String(req.nota || 'Cobro')]]);
   hv.getRange(f, 5, 1, 3).setValues([[nuevoPagado, nuevoSaldo, estado]]);
   return { id: id, pagado: nuevoPagado, saldo: nuevoSaldo, estado: estado };
 }

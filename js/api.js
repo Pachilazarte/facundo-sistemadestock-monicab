@@ -24,14 +24,14 @@ const CFG = {url: resolverUrl()};
 
 // Si la respuesta de Google viene rota (pasa de vez en cuando), se reintenta 1 vez. Es seguro: las lecturas no cambian nada
 // y las escrituras llevan "rid", así el servidor nunca las aplica dos veces.
-async function api(action, data = {}, rid) {
-  try { return await apiUna(action, data, rid); }
-  catch (e) { if (e.reintentable) return apiUna(action, data, rid); throw e; }
+async function api(action, data = {}, rid, ms) {
+  try { return await apiUna(action, data, rid, ms); }
+  catch (e) { if (e.reintentable) return apiUna(action, data, rid, ms); throw e; }
 }
 
 // POST con text/plain: es una "petición simple", así el navegador no hace preflight CORS.
-async function apiUna(action, data, rid) {
-  const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), 45000);
+async function apiUna(action, data, rid, ms = 45000) {
+  const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), ms);
   let r;
   try {
     r = await fetch(CFG.url, {
@@ -80,7 +80,7 @@ function guardarCache() { // se agrupa: escribir en el disco local es lento en e
       localStorage.setItem(CACHE_KEY, JSON.stringify({ts: S.ts || Date.now(), d: {
         productos: S.productos.map(({k, ...p}) => p), ventas: S.ventas.slice(0, 300), metodos: S.metodos, negocio: S.negocio,
         avisos: S.avisos, hoy: S.hoy, version: S.version
-      }}));
+      }, ap: typeof aplicadas !== 'undefined' ? [...aplicadas] : []}));
     } catch (e) {}
   }, 400);
 }
@@ -89,6 +89,7 @@ function cargarCache() {
     const c = JSON.parse(localStorage.getItem(CACHE_KEY) || 'null');
     if (!c?.d?.productos) return false;
     S = {...S, ...c.d, cargado: true, desdeCache: c.ts, ts: c.ts, hoySucio: false};
+    if (typeof aplicadas !== 'undefined') (c.ap || []).forEach(r => aplicadas.add(r));
     indexar();
     return true;
   } catch (e) { return false; }
@@ -102,17 +103,22 @@ async function sync(silencioso) {
   const mi = ++syncSeq; // si hay dos sincronizaciones en vuelo, solo vale la última
   $('#btnSync').classList.add('girando');
   try {
+    if (typeof pendientes === 'function' && colaActiva() && pendientes().length) await subirCola(); // primero lo guardado sin internet
     const j = await api('cargar');
     if (mi !== syncSeq) return;
     if (j.redirect && j.redirect !== CFG.url && URL_OK.test(j.redirect) && !sessionStorage.getItem('stocklite_mudado')) { await mudarse(j.redirect); if (mi !== syncSeq) return; }
     const avisos = j.avisos || [];
+    if ((j.version || 1) >= SERVIDOR_MINIMO && (j.version || 1) < 5) avisos.unshift('Para que las ventas hechas sin internet se guarden y se suban solas, actualizá el servidor: pegá el Codigo.gs nuevo (versión 5) y publicá "Nueva versión".');
     if ((j.version || 1) < SERVIDOR_MINIMO) avisos.unshift(`El servidor de esta planilla (Codigo.gs) está desactualizado (versión ${j.version || 1}, se necesita ${SERVIDOR_MINIMO}). Pegá el Codigo.gs nuevo en Apps Script y publicá "Nueva versión".`);
     S = {...S, productos: j.productos, ventas: j.ventas, metodos: j.metodos, negocio: j.negocio, avisos,
          hoy: j.hoy || null, hoySucio: false, version: j.version || 1,
          cargado: true, error: '', desdeCache: 0, ts: Date.now()};
-    indexar(); ultimaSync = Date.now(); guardarCache();
+    indexar(); ultimaSync = Date.now();
+    if (typeof reaplicarCola === 'function' && colaActiva()) reaplicarCola(); // lo que todavía no se subió se vuelve a poner encima
+    guardarCache();
     estadoSync();
     renderAll();
+    if (typeof actualizarAvisoCola === 'function') actualizarAvisoCola();
   } catch (e) {
     if (mi !== syncSeq) return;
     S.error = e.message; estadoSync();
