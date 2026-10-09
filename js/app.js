@@ -18,6 +18,17 @@ function irA(tab) {
 $('#nav').addEventListener('click', e => { const b = e.target.closest('[data-tab]'); if (b) irA(b.dataset.tab); });
 window.addEventListener('keydown', e => { if (e.key === 'F2' && !getModalActivo()) { e.preventDefault(); irA('vender'); } });
 
+/* Pantalla completa (botón; F11 del navegador hace lo mismo). Si el navegador no lo permite, el botón se oculta. */
+if (!document.documentElement.requestFullscreen) $('#btnPantalla').hidden = true;
+$('#btnPantalla').addEventListener('click', () => {
+  if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen().catch(() => toast('Tu navegador no permitió la pantalla completa. Probá con F11.', 'err'));
+});
+document.addEventListener('fullscreenchange', () => {
+  const full = !!document.fullscreenElement;
+  $('#btnPantalla use').setAttribute('href', '#i-' + (full ? 'minimize' : 'maximize'));
+  $('#btnPantalla').title = full ? 'Salir de pantalla completa (Esc)' : 'Pantalla completa (F11)';
+});
+
 /* Vista grande: letra y botones más grandes, el menú pasa arriba en una botonera. No saca ninguna opción. Se recuerda en este equipo. */
 function vistaGrande(on, guardar) {
   document.documentElement.classList.toggle('vg', on);
