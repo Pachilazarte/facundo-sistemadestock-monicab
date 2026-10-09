@@ -156,7 +156,6 @@ html.vg #lateralPie > div { flex-direction: row !important; }
 html.vg #syncTxt { display: block !important; font-size: .65rem; line-height: 1.1; max-width: 4.6rem; padding: 0; }
 html.vg #ver { display: none !important; }
 html.vg .vg-lbl { display: none !important; } /* queda "Aa" encendido; el nombre está en el título (tooltip) */
-html.vg #btnVG, html.vg #btnSync { padding: .35rem .6rem; }
 
 /* Controles más cómodos de tocar y de leer */
 html.vg .btn { padding: .7rem 1.1rem; font-size: 1rem; }
@@ -169,3 +168,10 @@ html.vg .tabla td { font-size: 1.05rem; }
 html.vg dialog { width: min(600px, 96vw); }
 
 #btnVG.on::before { display: none; } /* el interruptor no lleva la marca lateral de "sección actual" */
+
+/* Botones chicos del pie del menú (Vista grande, Pantalla completa, Actualizar): discretos, no ensanchan la barra */
+.mini { width: 1.9rem; height: 1.9rem; padding: 0; justify-content: center; border-radius: 8px; opacity: .7; flex-shrink: 0; }
+.mini:hover { opacity: 1; }
+.mini.on { opacity: 1; background: rgb(var(--c-lateral-activo) / .16); color: rgb(var(--c-lateral-activo)); }
+.mini svg { width: 1.05rem; height: 1.05rem; }
+html.vg .mini { width: 1.8rem; height: 1.8rem; }
