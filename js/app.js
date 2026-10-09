@@ -301,7 +301,7 @@ $('#btnCobrar').addEventListener('click', async () => {
       r.venta.items = lineas; S.ventas.unshift(r.venta);
       toast(`Venta #${r.id} guardada en la planilla · ${money(r.total)}${r.saldo > 0 ? ' · debe ' + money(r.saldo) : ''}`, 'ok');
       if (r.advertencia) toast(r.advertencia, 'err');
-    } else toast(`Venta guardada en esta computadora · ${money(total)}. No se pudo subir ahora: se sube sola cuando haya internet.`, 'ok');
+    } else toast(`Venta guardada · ${money(total)}${saldo > 0.009 ? ' · debe ' + money(saldo) : ''}`, 'ok'); // sin internet: se guarda y se sube sola, sin avisar
     tras(); vaciarTicket(); actualizarBadge(); $('#q').focus();
   } catch (e) { toast(e.message, 'err'); b.disabled = false; }
   finally { $('span', b).textContent = 'Cobrar'; b.disabled = !cart.length; }
@@ -408,7 +408,7 @@ function modalIngreso(codigo) {
       const payload = {codigo: p.codigo, cantidad, costo, nota: v(d, 'nota')};
       const o = await ejecutar('ingresoStock', payload, ridDe(nonce, payload), {resumen: `${p.nombre} +${num(cantidad)}`});
       if (o.confirmada) { toast(`${o.r.producto.nombre}: ahora hay ${num(o.r.producto.stock)} (guardado en la planilla)`, 'ok'); aplicarProducto(o.r); }
-      else { toast(`${p.nombre}: ingreso guardado en esta computadora, se sube solo cuando haya internet`, 'ok'); tras(); renderVista(); }
+      else { toast(`${p.nombre}: ahora hay ${num(p.stock)}`, 'ok'); tras(); renderVista(); }
     }});
 }
 function modalAjuste(codigo) {
@@ -422,7 +422,7 @@ function modalAjuste(codigo) {
       const payload = {codigo, nuevoStock: n, nota: v(d, 'nota') || 'Ajuste manual'};
       const o = await ejecutar('ajusteStock', payload, ridDe(nonce, payload), {resumen: `${p.nombre} → ${num(n)}`});
       if (o.confirmada) { toast('Stock ajustado y guardado en la planilla', 'ok'); aplicarProducto(o.r); }
-      else { toast('Ajuste guardado en esta computadora, se sube solo cuando haya internet', 'ok'); tras(); renderVista(); }
+      else { toast('Stock ajustado', 'ok'); tras(); renderVista(); }
     }});
 }
 
@@ -438,7 +438,7 @@ function renderCobros() {
     const dias = diasDesde(x.fecha);
     return `<tr>
       <td><div class="flex items-center gap-3 cursor-pointer rounded" tabindex="0" data-pay="${x.id}"><span class="grid place-items-center w-9 h-9 rounded-full bg-marca-claro text-marca text-xs font-extrabold shrink-0">${esc(iniciales(x.cliente))}</span><b>${esc(x.cliente)}</b></div></td>
-      <td><span class="font-bold">${x.pendiente ? 'Sin subir' : '#' + x.id}</span><div class="text-xs ${dias > 7 ? 'text-aviso font-bold' : 'text-suave'}">${hace(dias)}</div></td>
+      <td><span class="font-bold">${x.pendiente ? '·' : '#' + x.id}</span><div class="text-xs ${dias > 7 ? 'text-aviso font-bold' : 'text-suave'}">${hace(dias)}</div></td>
       <td class="r num">${money(x.total)}</td><td class="r num text-suave">${money(x.pagado)}</td>
       <td class="r num font-extrabold text-peligro">${money(x.saldo)}</td>
       <td class="r"><button class="btn btn-sm btn-marca" data-pay="${x.id}">${ic('wallet', 'w-3.5 h-3.5')}Cobrar</button></td></tr>`;
@@ -450,7 +450,7 @@ $('#cobrosBody').addEventListener('click', e => { const b = e.target.closest('[d
 function modalPago(id) {
   const x = S.ventas.find(s => s.id === id), nonce = uid();
   if (!x) return;
-  if (x.pendiente) return toast('Esa venta todavía no se subió a la planilla. Cuando suba (apenas haya internet) vas a poder cobrarle el saldo.', 'err');
+  if (x.pendiente) return toast('Esa venta se está terminando de guardar. Probá de nuevo en unos minutos.', 'err');
   modal({titulo: `Cobrar venta #${id}`, icono: 'wallet', ok: 'Registrar cobro', body: `
     <p class="text-sm text-suave">${esc(x.cliente)} · total ${money(x.total)} · pagado ${money(x.pagado)}</p>
     <p class="mt-1">Debe <b class="text-peligro text-xl num">${money(x.saldo)}</b></p>
@@ -466,7 +466,7 @@ function modalPago(id) {
         const r = o.r;
         Object.assign(x, {pagado: r.pagado, saldo: r.saldo, estado: r.estado});
         toast(r.saldo > 0.009 ? `Cobro guardado en la planilla · todavía debe ${money(r.saldo)}` : 'Venta saldada y guardada en la planilla', 'ok');
-      } else toast('Cobro guardado en esta computadora, se sube solo cuando haya internet', 'ok');
+      } else toast(x.saldo > 0.009 ? `Cobro guardado · todavía debe ${money(x.saldo)}` : 'Venta saldada', 'ok');
       tras(); actualizarBadge(); renderVista();
     }});
 }
@@ -479,9 +479,9 @@ function renderVentas() {
   const q = plain($('#qv').value.trim());
   const l = S.ventas.filter(x => !q || plain(x.cliente).includes(q) || String(x.id) === q).slice(0, LIM_VENTAS);
   $('#ventasBody').innerHTML = l.length ? l.map(x => `<tr class="fila-click" tabindex="0" data-v="${x.id}">
-      <td class="font-bold">${x.pendiente ? '<span class="text-aviso text-xs">Sin subir</span>' : '#' + x.id}</td><td class="text-suave whitespace-nowrap">${fdateCorta(x.fecha)}</td><td class="whitespace-nowrap">${esc(x.cliente)}</td>
+      <td class="font-bold">${x.pendiente ? '·' : '#' + x.id}</td><td class="text-suave whitespace-nowrap">${fdateCorta(x.fecha)}</td><td class="whitespace-nowrap">${esc(x.cliente)}</td>
       <td class="text-suave text-sm max-w-[13rem] truncate">${x.items ? esc(compro(x)) : '<span class="text-marca font-bold">Ver detalle</span>'}</td>
-      <td class="r num font-bold">${money(x.total)}</td><td class="r num ${x.saldo > 0.009 ? 'text-peligro font-bold' : 'text-suave'}">${x.saldo > 0.009 ? money(x.saldo) : '—'}</td><td>${x.pendiente ? '<span class="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-bold bg-aviso-claro text-aviso">' + ic('clock', 'w-3 h-3') + 'Sin subir</span>' : badge(x.estado)}</td>
+      <td class="r num font-bold">${money(x.total)}</td><td class="r num ${x.saldo > 0.009 ? 'text-peligro font-bold' : 'text-suave'}">${x.saldo > 0.009 ? money(x.saldo) : '—'}</td><td>${badge(x.estado)}</td>
       <td class="text-suave">${ic('chevron-right', 'w-4 h-4')}</td></tr>`).join('')
     : `<tr><td colspan="8"><div class="text-center text-suave py-10">${ic('receipt', 'w-9 h-9 mx-auto mb-2')}<p class="font-bold text-texto">${q ? 'Sin resultados' : 'Todavía no hay ventas'}</p><p class="text-sm">${q ? 'Probá con otro nombre o número.' : 'Las ventas que hagas van a aparecer acá.'}</p></div></td></tr>`;
 }
@@ -492,7 +492,7 @@ $('#ventasBody').addEventListener('click', e => { const tr = e.target.closest('t
 function abrirVenta(id) {
   const x = S.ventas.find(s => s.id === id); if (!x) return;
   const local = x.items?.length ? x.items.map(i => ({codigo: i[0], nombre: i[1], cantidad: i[2], precio: i[3], subtotal: i[4]})) : null;
-  const d = modal({titulo: x.pendiente ? `Venta sin subir · ${x.cliente}` : `Venta #${id} · ${x.cliente}`, icono: 'receipt', cancel: 'Cerrar', body: '<div data-det></div>'});
+  const d = modal({titulo: x.pendiente ? `Venta · ${x.cliente}` : `Venta #${id} · ${x.cliente}`, icono: 'receipt', cancel: 'Cerrar', body: '<div data-det></div>'});
   const det = $('[data-det]', d);
   const pintar = (items, pagos, error) => {
     det.innerHTML = `
@@ -520,7 +520,7 @@ function abrirVenta(id) {
 
 function modalAnular(id) {
   const nonce = uid();
-  if (id < 0) return toast('Esa venta todavía no se subió a la planilla. Anulala cuando suba (apenas haya internet).', 'err');
+  if (id < 0) return toast('Esa venta se está terminando de guardar. Probá de nuevo en unos minutos.', 'err');
   modal({titulo: `Anular venta #${id}`, icono: 'ban', ok: 'Sí, anular', okIcono: 'ban', peligro: true, body: `
     <p class="text-sm">Se <b>devuelve el stock</b> y se registra la devolución del dinero cobrado. <b class="text-peligro">No se puede deshacer.</b></p>
     <label class="etiqueta">Motivo</label><input name="nota" class="campo">`,

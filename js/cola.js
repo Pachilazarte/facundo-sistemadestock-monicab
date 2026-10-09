@@ -158,11 +158,11 @@ window.addEventListener('online', () => { if (COLA.length) intentarSubir(); });
 /* ---------- Aviso y pantalla de pendientes ---------- */
 function actualizarAvisoCola() {
   const b = $('#pendientes'); if (!b) return;
-  const p = pendientes().length, x = conProblema().length;
-  b.hidden = !(p || x);
-  if (b.hidden) return;
-  b.className = 'shrink-0 flex items-center gap-2 font-bold text-sm px-6 py-2.5 text-left hover:brightness-95 ' + (x ? 'bg-peligro-claro text-peligro' : 'bg-aviso-claro text-aviso');
-  b.innerHTML = `${ic(x ? 'triangle-alert' : 'clock', 'w-4 h-4')}<span>${p ? `${p} ${p === 1 ? 'operación guardada' : 'operaciones guardadas'} en esta computadora, sin subir a la planilla (se suben solas cuando haya internet).` : ''}${x ? ` ${x} con problema: tocá para revisar.` : ' Tocá para ver.'}</span>`;
+  const x = conProblema().length;
+  b.hidden = !x; // esperar internet es SILENCIOSO: solo se avisa si el servidor rechazó algo y hay que revisarlo
+  if (!x) return;
+  b.className = 'shrink-0 flex items-center gap-2 font-bold text-sm px-6 py-2.5 text-left hover:brightness-95 bg-peligro-claro text-peligro';
+  b.innerHTML = `${ic('triangle-alert', 'w-4 h-4')}<span>${x} ${x === 1 ? 'operación no se pudo guardar' : 'operaciones no se pudieron guardar'} en la planilla: tocá para revisar.</span>`;
 }
 
 const TIPOS = {registrarVenta: 'Venta', registrarPago: 'Cobro', ingresoStock: 'Ingreso de stock', ajusteStock: 'Ajuste de stock'};
@@ -172,7 +172,7 @@ function modalPendientes() {
         <div class="text-sm text-suave truncate">${esc(o.meta?.resumen || '')}</div>
         <div class="text-xs font-bold ${o.estado === 'problema' ? 'text-peligro' : 'text-aviso'}">${o.estado === 'problema' ? 'Problema: ' + esc(o.error || '') : 'Esperando internet'}</div></div>
       ${o.estado === 'problema' ? `<button type="button" class="btn btn-sm" data-r>Reintentar</button><button type="button" class="btn btn-sm btn-peligro" data-d>Descartar</button>` : ''}</div>`).join('') || '<p class="text-sm text-suave py-3">No hay nada pendiente. Todo está subido a la planilla ✅</p>';
-  const d = modal({titulo: 'Sin subir a la planilla', icono: 'clock', cancel: 'Cerrar', body: `
+  const d = modal({titulo: 'Para revisar', icono: 'clock', cancel: 'Cerrar', body: `
     <p class="text-sm text-suave mb-2">Esto está guardado en esta computadora y se sube solo cuando hay internet. <b class="text-texto">No se pierde</b> aunque se apague la compu o pasen días.</p>
     <div class="rounded-xl border border-borde divide-y divide-borde/70" data-lista>${lista()}</div>
     <div class="flex flex-wrap gap-2 mt-3"><button type="button" class="btn btn-marca" data-subir>${ic('refresh-cw', 'w-4 h-4')}Subir ahora</button><button type="button" class="btn" data-copia>${ic('download', 'w-4 h-4')}Guardar una copia (archivo)</button></div>`});
