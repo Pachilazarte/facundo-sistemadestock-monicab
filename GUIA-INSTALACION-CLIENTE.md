@@ -223,8 +223,8 @@ Si abrió la app sin el link de instalación, le va a mostrar una pantalla **"Co
 ## D1. Actualizar la app (pantallas, mejoras) — para TODOS los clientes a la vez
 
 1. Hacé los cambios en `C:\Users\PERSONAL\Documents\basura\7`.
-2. Si tocaste clases de Tailwind (en `index.html` o `js\*.js`), ejecutá **`construir-css.bat`** (doble clic en esa carpeta): regenera `css\tailwind.css`. Necesita Node.js e internet en TU PC. Si solo cambiaste textos o lógica, no hace falta.
-3. Subí el número `APP_VERSION` en `js\version.js` (por ejemplo de `'1.1.0'` a `'1.1.1'`).
+2. Si tocaste clases de Tailwind (en `index.html` o `js\*.js`), ejecutá **`construir-css.bat`** (doble clic en esa carpeta): regenera `css\tailwind.css`. Si agregaste un ícono nuevo, ejecutá **`construir-iconos.bat`**. Necesitan Node.js e internet en TU PC. Si solo cambiaste textos o lógica, no hace falta ninguno.
+3. **Subí el número `APP_VERSION`** en `js\version.js` (por ejemplo de `'1.2.0'` a `'1.2.1'`). Es **obligatorio**: la app guarda sus archivos para abrir al instante y solo baja los nuevos cuando ese número cambia.
 4. Subir a GitHub (en una terminal dentro de esa carpeta):
    ```
    git add -A

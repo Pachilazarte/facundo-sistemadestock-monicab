@@ -37,7 +37,10 @@ gs/Codigo.gs                                      → el backend (va en la plani
 
 ## 3. Publicar una actualización de la app
 
-1. Hacé los cambios. Si tocaste clases de Tailwind en `index.html` o `js/*.js`, corré **`construir-css.bat`** (regenera `css/tailwind.css`; necesita Node e internet en TU PC). Después **subí `APP_VERSION` en `js/version.js`** y hacé push.
+1. Hacé los cambios. Según lo que toques, corré antes de publicar (necesitan Node e internet en TU PC):
+   - **`construir-css.bat`** si tocaste clases de Tailwind en `index.html` o `js/*.js` (regenera `css/tailwind.css`).
+   - **`construir-iconos.bat`** si agregaste un ícono nuevo (regenera el conjunto de íconos dentro de `index.html`; los nombres son los de lucide.dev/icons).
+   Después **subí `APP_VERSION` en `js/version.js`** (es obligatorio: la app guarda sus archivos y solo baja los nuevos cuando cambia ese número) y hacé push.
 2. Listo. Las PCs instaladas toman los archivos nuevos cada vez que abren la app, y si la tienen abierta todo el día, en ≤30 min muestran la barra *"Hay una versión nueva — tocá para actualizar"*.
 
 ## 4. Actualizar el backend (Codigo.gs) de un cliente
@@ -54,6 +57,8 @@ Cuando cambies el backend de forma que la app vieja ya no sirva: subí `VERSION_
 
 - **Sin internet:** la app abre igual (copia guardada), pero las ventas necesitan conexión. Si se corta a mitad de una venta, el ticket queda guardado y se reintenta sin duplicar.
 - **Uso local sin instalar:** abrí `index.html?c=ID_DEL_SCRIPT` directo desde la carpeta (sin actualizaciones automáticas).
+- **Liviano a propósito:** sin animaciones decorativas, íconos propios (8 KB en vez de 358 KB), fuente propia, estilos precompilados, y pocos pedidos a Google: 1 por acción, ninguno por reloj. Se dibuja solo la pestaña visible. Pensado para netbooks de 10" (1024×600, 2 GB).
+- **Servidor v3** (`VERSION_SERVIDOR = 3`): agrega *eliminar producto* y trae el detalle de ventas y el resumen de hoy en la carga inicial. Con un servidor v2 la app sigue andando (sin esas funciones).
 - **Equipos viejos (netbook con Windows 7 de 32 bits):** ver la Parte F de `GUIA-INSTALACION-CLIENTE.md`. El CSS va precompilado (no se compila en el navegador) justamente para que ande liviano.
 - **Marca/colores:** todo sale de `css/colores.css`. Si cambiás `--c-marca` o `--c-fondo`, actualizá también `theme_color` / `background_color` en `manifest.webmanifest` y el `<meta name="theme-color">` de `index.html` (el navegador no lee variables ahí).
 - **Íconos:** `icons/icon-192.png` y `icon-512.png` (reemplazables por el logo del cliente).

@@ -26,7 +26,7 @@ const COLS = {
   Movimientos: ['Fecha', 'ID Producto', 'Producto', 'Tipo', 'Cantidad', 'Stock final', 'Nota']
 };
 // Se sube cuando cambia algo que el HTML necesita (la app avisa si el servidor del cliente quedó atrás).
-const VERSION_SERVIDOR = 2;
+const VERSION_SERVIDOR = 3;
 const MONEDA = '$ #,##0.00', FECHA = 'dd/mm/yyyy hh:mm';
 // [columna inicial, cantidad de columnas, formato]
 const FORMATOS = {
@@ -256,7 +256,7 @@ function despachar_(req) {
   const lecturas = { cargar: cargar_, detalleVenta: detalleVenta_, resumen: resumen_ };
   const escrituras = {
     guardarProducto: guardarProducto_, ingresoStock: ingresoStock_, ajusteStock: ajusteStock_,
-    registrarVenta: registrarVenta_, registrarPago: registrarPago_, anularVenta: anularVenta_
+    registrarVenta: registrarVenta_, registrarPago: registrarPago_, anularVenta: anularVenta_, eliminarProducto: eliminarProducto_
   };
   if (lecturas[req.action]) { const o = lecturas[req.action](req); o.ok = true; return o; }
   if (escrituras[req.action]) return escribir_(escrituras[req.action], req);
@@ -300,7 +300,7 @@ function cargarInterno_(puedeEscribir) {
 
   // ---- Ventas: columnas sueltas + ventana reciente (no la hoja entera) ----
   const hv = hoja_('Ventas'), nV = hv.getLastRow() - 1;
-  let porCobrar = 0, ventas = [];
+  let porCobrar = 0, ventas = [], hoy = resumenDe_([], [], [], hoyMs);
   if (nV > 0) {
     const sg = hv.getRange(2, 6, nV, 2).getValues();            // Saldo, Estado (todas las filas, 2 columnas)
     const pend = [];
@@ -314,18 +314,37 @@ function cargarInterno_(puedeEscribir) {
     const filas = v.filas.map(function (r, k) { return [v.ini + k, r]; });
     const viejas = filasPorIndice_(hv, pend.filter(function (i) { return i < v.ini; }), 8); // deudas antiguas
     Object.keys(viejas).forEach(function (i) { filas.push([Number(i), viejas[i]]); });
+
+    // Ítems de las ventas de la ventana: UN solo bloque de la hoja Detalle (así el detalle se ve al instante, sin pedir nada)
+    let minId = Infinity;
+    v.filas.forEach(function (r) { const id = Number(r[0]); if (r[0] !== '' && id < minId) minId = id; });
+    const det = detalleDesdeId_(minId);
+    const items = {};
+    det.forEach(function (r) {
+      const id = Number(r[0]);
+      if (!items[id]) items[id] = [];
+      items[id].push([String(r[1]), String(r[2]), Number(r[3]) || 0, Number(r[4]) || 0, Number(r[5]) || 0]);
+    });
+
     ventas = filas.filter(function (x) { return x[1][0] !== ''; }).map(function (x) {
-      const r = x[1];
-      return {
-        id: Number(r[0]), fecha: fecha_(r[1], tz), cliente: String(r[2]), total: Number(r[3]) || 0,
+      const r = x[1], id = Number(r[0]);
+      const o = {
+        id: id, fecha: fecha_(r[1], tz), cliente: String(r[2]), total: Number(r[3]) || 0,
         pagado: Number(r[4]) || 0, saldo: Number(r[5]) || 0, estado: String(r[6]), metodo: String(r[7])
       };
+      if (items[id]) o.items = items[id];
+      return o;
     }).sort(function (a, b) { return b.id - a.id; });
+
+    // Resumen de HOY con lo que ya se leyó (más los pagos de hoy): la pantalla "Resumen" abre sin pedir nada más
+    const pagosHoy = leerDesde_(hoja_('Pagos'), 7, hoyMs, 0).filas;
+    hoy = resumenDe_(v.filas, pagosHoy, det, hoyMs);
   }
 
   return {
     productos: prods.map(function (p) { return p.obj; }),
     ventas: ventas,
+    hoy: hoy,
     avisos: revisarDatos_(prods),
     metodos: cfg_('Métodos de pago', METODOS_DEFAULT).split(',').map(function (s) { return s.trim(); }).filter(String),
     negocio: cfg_('Negocio', 'Mi Negocio'),
@@ -346,53 +365,48 @@ function detalleVenta_(req) {
   return { items: items, pagos: pagos };
 }
 
-// Resumen por período (hoy | semana | mes): ventas, cobrado, caja por método, ganancia estimada y más vendidos.
+// Cálculo del resumen a partir de filas ya leídas (lo usan "cargar" para HOY y "resumen" para 7 días / mes).
+function resumenDe_(filasVentas, filasPagos, filasDetalle, desde) {
+  const enPeriodo = function (r) { return r[0] !== '' && r[1] instanceof Date && r[1].getTime() >= desde; };
+  let total = 0, cantidad = 0;
+  const validas = {};
+  filasVentas.filter(enPeriodo).forEach(function (r) {
+    if (String(r[6]) === 'Anulada') return;
+    total += Number(r[3]) || 0; cantidad++; validas[Number(r[0])] = true;
+  });
+  let cobrado = 0;
+  const porMetodo = {};
+  filasPagos.filter(enPeriodo).forEach(function (r) {
+    const m = Number(r[4]) || 0, k = String(r[5]) || 'Otro';
+    cobrado += m; porMetodo[k] = r2_((porMetodo[k] || 0) + m);
+  });
+  let ganancia = 0;
+  const top = {};
+  filasDetalle.forEach(function (r) {
+    if (!validas[Number(r[0])]) return;
+    const c = Number(r[3]) || 0, sub = Number(r[5]) || 0, costo = Number(r[6]) || 0, nom = String(r[2]);
+    ganancia += sub - costo * c;
+    const t = top[nom] || (top[nom] = { nombre: nom, cantidad: 0, total: 0 });
+    t.cantidad = r3_(t.cantidad + c); t.total = r2_(t.total + sub);
+  });
+  return {
+    ventas: r2_(total), cantidad: cantidad, ticket: cantidad ? r2_(total / cantidad) : 0,
+    cobrado: r2_(cobrado), porMetodo: porMetodo, ganancia: r2_(ganancia),
+    top: Object.keys(top).map(function (k) { return top[k]; }).sort(function (a, b) { return b.total - a.total; }).slice(0, 8)
+  };
+}
+
+// Resumen por período (hoy | semana | mes), leyendo solo lo necesario.
 function resumen_(req) {
   const tz = ss_().getSpreadsheetTimeZone();
   const periodo = ['hoy', 'semana', 'mes'].indexOf(req.periodo) >= 0 ? req.periodo : 'hoy';
   const desde = inicioPeriodo_(tz, periodo);
-  const enPeriodo = function (r) { return r[0] !== '' && r[1] instanceof Date && r[1].getTime() >= desde; };
-
-  let total = 0, cantidad = 0, minId = Infinity;
-  const validas = {};
-  leerDesde_(hoja_('Ventas'), 8, desde, 0).filas.filter(enPeriodo).forEach(function (r) {
-    if (String(r[6]) === 'Anulada') return;
-    const id = Number(r[0]);
-    total += Number(r[3]) || 0; cantidad++; validas[id] = true;
-    if (id < minId) minId = id;
-  });
-
-  let cobrado = 0;
-  const porMetodo = {};
-  leerDesde_(hoja_('Pagos'), 7, desde, 0).filas.filter(enPeriodo).forEach(function (r) {
-    const m = Number(r[4]) || 0, k = String(r[5]) || 'Otro';
-    cobrado += m; porMetodo[k] = r2_((porMetodo[k] || 0) + m);
-  });
-
-  let ganancia = 0;
-  const top = {};
-  if (cantidad > 0) {
-    const hd = hoja_('Detalle'), n = hd.getLastRow() - 1;
-    if (n > 0) {
-      const ids = hd.getRange(2, 1, n, 1).getValues();
-      let ini = n;
-      for (let i = 0; i < n; i++) if (Number(ids[i][0]) >= minId) { ini = i; break; }
-      if (ini < n) {
-        hd.getRange(2 + ini, 1, n - ini, 7).getValues().forEach(function (r) {
-          if (!validas[Number(r[0])]) return;
-          const c = Number(r[3]) || 0, sub = Number(r[5]) || 0, costo = Number(r[6]) || 0, nom = String(r[2]);
-          ganancia += sub - costo * c;
-          const t = top[nom] || (top[nom] = { nombre: nom, cantidad: 0, total: 0 });
-          t.cantidad = r3_(t.cantidad + c); t.total = r2_(t.total + sub);
-        });
-      }
-    }
-  }
-  return {
-    periodo: periodo, ventas: r2_(total), cantidad: cantidad, ticket: cantidad ? r2_(total / cantidad) : 0,
-    cobrado: r2_(cobrado), porMetodo: porMetodo, ganancia: r2_(ganancia),
-    top: Object.keys(top).map(function (k) { return top[k]; }).sort(function (a, b) { return b.total - a.total; }).slice(0, 8)
-  };
+  const ventas = leerDesde_(hoja_('Ventas'), 8, desde, 0).filas;
+  let minId = Infinity;
+  ventas.forEach(function (r) { const id = Number(r[0]); if (r[0] !== '' && String(r[6]) !== 'Anulada' && id < minId) minId = id; });
+  const r = resumenDe_(ventas, leerDesde_(hoja_('Pagos'), 7, desde, 0).filas, detalleDesdeId_(minId), desde);
+  r.periodo = periodo;
+  return r;
 }
 
 /* ========================= ESCRITURAS ========================= */
@@ -462,6 +476,17 @@ function ajusteStock_(req) {
   p.obj.stock = nuevo;
   agregar_(hoja_('Movimientos'), [[new Date(), Number(p.obj.codigo) || p.obj.codigo, p.obj.nombre, 'Ajuste', dif, nuevo, String(req.nota || 'Ajuste manual')]]);
   return { producto: p.obj };
+}
+
+function eliminarProducto_(req) {
+  const p = buscarProducto_(norm_(req.codigo));
+  hoja_('Productos').deleteRow(p.fila);   // las ventas ya hechas guardan el nombre y el precio: no se pierde historial
+  let advertencia = '';
+  try {
+    agregar_(hoja_('Movimientos'), [[new Date(), Number(p.obj.codigo) || p.obj.codigo, p.obj.nombre, 'Eliminación', -p.obj.stock, 0,
+      'Producto eliminado' + (req.nota ? ': ' + req.nota : '')]]);
+  } catch (e) { advertencia = 'El producto se eliminó pero no se pudo anotar en Movimientos.'; }
+  return { codigo: p.obj.codigo, nombre: p.obj.nombre, advertencia: advertencia };
 }
 
 function registrarVenta_(req) {
@@ -644,6 +669,16 @@ function filasPorIndice_(h, idxs, ncols) {
     i = j + 1;
   }
   return out;
+}
+
+// Filas del Detalle de todas las ventas con ID >= minId (un solo bloque: el Detalle está ordenado por venta).
+function detalleDesdeId_(minId) {
+  const hd = hoja_('Detalle'), n = hd.getLastRow() - 1;
+  if (n < 1 || !isFinite(minId)) return [];
+  const ids = hd.getRange(2, 1, n, 1).getValues();
+  let ini = n;
+  for (let i = 0; i < n; i++) if (Number(ids[i][0]) >= minId) { ini = i; break; }
+  return ini < n ? hd.getRange(2 + ini, 1, n - ini, 7).getValues() : [];
 }
 
 function bloqueDetalle_(id) {

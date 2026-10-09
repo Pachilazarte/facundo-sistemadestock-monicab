@@ -31,13 +31,18 @@ const fdate = iso => {
   const d = new Date(iso);
   return d.toLocaleDateString('es-AR') + ' ' + d.toLocaleTimeString('es-AR', {hour: '2-digit', minute: '2-digit'});
 };
+// Para tablas: "9/10 13:26" (el año y los segundos sobran y ocupan lugar)
+const fdateCorta = iso => { if (!iso) return ''; const d = new Date(iso); return d.getDate() + '/' + (d.getMonth() + 1) + ' ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); };
 const diasDesde = iso => Math.floor((Date.now() - new Date(iso)) / 864e5);
 const hace = n => n <= 0 ? 'hoy' : n === 1 ? 'ayer' : `hace ${n} días`;
 const iniciales = s => String(s).trim().split(/\s+/).slice(0, 2).map(w => w[0]).join('').toUpperCase();
 
-/* ---------- Íconos (Lucide) ---------- */
-const ic = (nombre, cls = 'w-4 h-4') => `<i data-lucide="${nombre}" class="${cls}"></i>`;
-const refreshIcons = () => { try { window.lucide?.createIcons(); } catch (e) {} };
+/* ---------- Íconos: conjunto propio incrustado en index.html (se regenera con construir-iconos.bat) ----------
+ * Un <svg> que apunta al símbolo: no hay que "recorrer la pantalla" después de dibujar, y pesa miles de veces menos. */
+const ic = (nombre, cls = 'w-4 h-4') => `<svg class="i ${cls}" aria-hidden="true"><use href="#i-${nombre}"/></svg>`;
+
+// Ejecuta la función recién cuando el usuario deja de escribir (en una PC lenta evita dibujar en cada tecla).
+const debounce = (fn, ms = 140) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; };
 
 /* ---------- Estados de venta: un solo lugar para sus colores/íconos ---------- */
 const ESTADOS = {
@@ -55,17 +60,16 @@ const badge = e => {
 function toast(msg, tipo = 'info') {
   const [ico, color] = {ok: ['circle-check', 'text-ok'], err: ['circle-alert', 'text-peligro'], info: ['info', 'text-marca']}[tipo] || ['info', 'text-marca'];
   const d = document.createElement('div');
-  d.className = 'toast-in flex items-start gap-2.5 bg-superficie border border-borde rounded-xl shadow-lg px-4 py-3 text-sm font-semibold max-w-sm';
+  d.className = 'flex items-start gap-2.5 bg-superficie border border-borde rounded-xl px-4 py-3 text-sm font-semibold max-w-sm';
   d.innerHTML = `<span class="${color} mt-px">${ic(ico, 'w-5 h-5')}</span><span>${esc(msg)}</span>`;
   $('#toast').append(d);
-  refreshIcons();
   setTimeout(() => d.remove(), tipo === 'err' ? 6000 : 2800);
 }
 
 /* ---------- Modal ----------
  * onOk(d) puede lanzar Error: el mensaje se muestra dentro del modal y no se cierra.
  * Sin onOk: modal informativo (solo "Cerrar"). */
-function modal({titulo, icono = 'circle', body, ok = 'Guardar', okIcono = 'check', onOk, cancel = 'Cancelar', forzado}) {
+function modal({titulo, icono = 'circle', body, ok = 'Guardar', okIcono = 'check', onOk, cancel = 'Cancelar', forzado, peligro}) {
   const d = document.createElement('dialog');
   d.innerHTML = `<form class="flex flex-col">
     <div class="flex items-center gap-3 px-6 pt-5 pb-2">
@@ -77,11 +81,10 @@ function modal({titulo, icono = 'circle', body, ok = 'Guardar', okIcono = 'check
     <p data-err class="mx-6 mt-2 rounded-lg bg-peligro-claro text-peligro text-sm font-bold px-3 py-2" hidden></p>
     <div class="flex justify-end gap-2 px-6 py-4">
       ${cancel ? `<button type="button" class="btn" data-close>${cancel}</button>` : ''}
-      ${onOk ? `<button class="btn btn-marca" data-ok>${ic(okIcono, 'w-4 h-4')}${ok}</button>` : ''}
+      ${onOk ? `<button class="btn ${peligro ? 'btn-rojo' : 'btn-marca'}" data-ok>${ic(okIcono, 'w-4 h-4')}${ok}</button>` : ''}
     </div></form>`;
   document.body.append(d);
   d.showModal();
-  refreshIcons();
   d.addEventListener('close', () => d.remove());
   if (forzado) d.addEventListener('cancel', e => e.preventDefault());
   $$('[data-close]', d).forEach(b => b.addEventListener('click', () => d.close()));

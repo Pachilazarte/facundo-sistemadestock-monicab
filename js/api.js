@@ -1,8 +1,14 @@
 'use strict';
-/* Conexión con Apps Script + estado global + caché local + sincronización. */
+/* Conexión con Apps Script + estado global + caché local + sincronización.
+ *
+ * Regla de oro (equipo lento + Google tarda 2 a 8 s por pedido): se le pide algo al servidor SOLO cuando hace falta.
+ *   - Al abrir:      1 pedido ("cargar"), y mientras tanto se muestra lo último que se vio (caché).
+ *   - Al guardar algo: 1 pedido (el de la acción). La respuesta ya trae lo que cambió: NO se vuelve a pedir todo.
+ *   - Al volver a la ventana tras 10+ minutos, o al tocar ↻, o al volver internet: 1 pedido ("cargar").
+ *   - NO hay recargas automáticas por reloj. */
 
 // Link del servidor (Apps Script). Orden: ?c= en la dirección (link de instalación) > guardado en este equipo > js/config.js
-const URL_OK = /^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/;
+const URL_OK = /^(https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec|http:\/\/localhost:\d+\/api)$/; // localhost: solo para pruebas
 function aUrl(c) { c = String(c || '').trim(); return c.startsWith('http') ? c : (c ? 'https://script.google.com/macros/s/' + c + '/exec' : ''); }
 function resolverUrl() {
   try {
@@ -23,21 +29,28 @@ async function api(action, data = {}, rid) {
   catch (e) { if (e.reintentable) return apiUna(action, data, rid); throw e; }
 }
 
-// POST con text/plain: es una "petición simple", así el navegador no hace preflight CORS y funciona abriendo el HTML desde el disco.
+// POST con text/plain: es una "petición simple", así el navegador no hace preflight CORS.
 async function apiUna(action, data, rid) {
   const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), 45000);
+  let r;
   try {
-    const r = await fetch(CFG.url, {
+    r = await fetch(CFG.url, {
       method: 'POST', headers: {'Content-Type': 'text/plain;charset=utf-8'},
       body: JSON.stringify({action, rid, ...data}), signal: ctl.signal
     });
+  } catch (e) {
+    clearTimeout(t);
+    if (e.name === 'AbortError') throw new Error('Tardó demasiado en responder. Reintentá sin cambiar nada: no se duplica.');
+    const x = new Error('No hay conexión con Google. Revisá el cable de internet y que la fecha y hora de la computadora sean correctas.');
+    x.reintentable = true; throw x;
+  }
+  try {
     const j = await r.json();
     if (!j.ok) throw new Error(j.error || 'Error desconocido');
     return j;
   } catch (e) {
-    if (e.name === 'AbortError') throw new Error('Tardó demasiado. Reintentá sin cambiar nada: no se duplica.');
-    if (e instanceof TypeError || e instanceof SyntaxError) {
-      const x = new Error('No se pudo conectar. Revisá internet.');
+    if (e instanceof SyntaxError) { // llegó algo que no es de la planilla: casi siempre el código del link está incompleto o mal copiado
+      const x = new Error('La planilla no respondió como se esperaba. Revisá que el link de instalación esté completo y bien copiado.');
       x.reintentable = true; throw x;
     }
     throw e;
@@ -45,7 +58,8 @@ async function apiUna(action, data, rid) {
 }
 
 /* ---------- Estado ---------- */
-let S = {productos: [], ventas: [], metodos: ['Efectivo'], avisos: [], negocio: 'Stock Lite', cargado: false, error: '', desdeCache: 0};
+let S = {productos: [], ventas: [], metodos: ['Efectivo'], avisos: [], negocio: 'Stock Lite', hoy: null, hoySucio: false, version: 0,
+         cargado: false, error: '', desdeCache: 0};
 
 // Clave de búsqueda precalculada: buscar no recalcula acentos/minúsculas de todos los productos en cada tecla.
 function indexar() { S.productos.forEach(p => { p.k = plain(p.nombre + ' ' + p.codigo + ' ' + p.categoria); }); }
@@ -57,26 +71,31 @@ function upsertProducto(p) {
 }
 
 /* ---------- Caché local: la app abre al instante con lo último que se vio y se actualiza por detrás ---------- */
-const CACHE_KEY = 'stocklite_cache_v2';
-function guardarCache() {
-  try {
-    localStorage.setItem(CACHE_KEY, JSON.stringify({ts: S.ts || Date.now(), d: {
-      productos: S.productos.map(({k, ...p}) => p), ventas: S.ventas.slice(0, 400), metodos: S.metodos, negocio: S.negocio, avisos: S.avisos
-    }}));
-  } catch (e) {}
+const CACHE_KEY = 'stocklite_cache_v3';
+let cacheTimer = null;
+function guardarCache() { // se agrupa: escribir en el disco local es lento en equipos viejos
+  clearTimeout(cacheTimer);
+  cacheTimer = setTimeout(() => {
+    try {
+      localStorage.setItem(CACHE_KEY, JSON.stringify({ts: S.ts || Date.now(), d: {
+        productos: S.productos.map(({k, ...p}) => p), ventas: S.ventas.slice(0, 300), metodos: S.metodos, negocio: S.negocio,
+        avisos: S.avisos, hoy: S.hoy, version: S.version
+      }}));
+    } catch (e) {}
+  }, 400);
 }
 function cargarCache() {
   try {
     const c = JSON.parse(localStorage.getItem(CACHE_KEY) || 'null');
     if (!c?.d?.productos) return false;
-    S = {...S, ...c.d, cargado: true, desdeCache: c.ts, ts: c.ts};
+    S = {...S, ...c.d, cargado: true, desdeCache: c.ts, ts: c.ts, hoySucio: false};
     indexar();
     return true;
   } catch (e) { return false; }
 }
 
 /* ---------- Sincronización ---------- */
-let syncSeq = 0, ultimaSync = 0, syncTimer = null;
+let syncSeq = 0, ultimaSync = 0;
 const horaCorta = ts => new Date(ts).toLocaleTimeString('es-AR', {hour: '2-digit', minute: '2-digit'});
 
 async function sync(silencioso) {
@@ -88,6 +107,7 @@ async function sync(silencioso) {
     const avisos = j.avisos || [];
     if ((j.version || 1) < SERVIDOR_MINIMO) avisos.unshift(`El servidor de esta planilla (Codigo.gs) está desactualizado (versión ${j.version || 1}, se necesita ${SERVIDOR_MINIMO}). Pegá el Codigo.gs nuevo en Apps Script y publicá "Nueva versión".`);
     S = {...S, productos: j.productos, ventas: j.ventas, metodos: j.metodos, negocio: j.negocio, avisos,
+         hoy: j.hoy || null, hoySucio: false, version: j.version || 1,
          cargado: true, error: '', desdeCache: 0, ts: Date.now()};
     indexar(); ultimaSync = Date.now(); guardarCache();
     estadoSync();
@@ -100,16 +120,12 @@ async function sync(silencioso) {
   } finally { if (mi === syncSeq) $('#btnSync').classList.remove('girando'); }
 }
 
-// Después de una operación NO se recarga todo al instante (la respuesta ya trae lo que cambió): se agrupa en una sola
-// sincronización unos segundos después, por si hay varias ventas seguidas.
-function programarSync(ms = 6000) { clearTimeout(syncTimer); syncTimer = setTimeout(() => sync(true), ms); }
-
 function estadoSync() {
   const el = $('#syncTxt');
   if (S.error) { el.innerHTML = `<span class="text-peligro-claro font-bold">Sin conexión</span>${S.ts ? ' · datos de ' + horaCorta(S.ts) : ''}`; return; }
   el.textContent = S.ts ? 'Actualizado ' + horaCorta(S.ts) : '—';
 }
 
-// Si la planilla se tocó a mano o pasó un rato, al volver a la pestaña se actualiza sola.
-document.addEventListener('visibilitychange', () => { if (!document.hidden && Date.now() - ultimaSync > 120000) sync(true); });
-setInterval(() => { if (!document.hidden && Date.now() - ultimaSync > 300000 && !document.querySelector('dialog[open]')) sync(true); }, 60000);
+// Por si se tocó la planilla a mano: al volver a la ventana después de 10+ minutos se actualiza. Y si volvió internet tras un corte.
+document.addEventListener('visibilitychange', () => { if (!document.hidden && Date.now() - ultimaSync > 600000) sync(true); });
+window.addEventListener('online', () => { if (S.error) sync(true); });
