@@ -83,9 +83,15 @@ function modal({titulo, icono = 'circle', body, ok = 'Guardar', okIcono = 'check
       ${cancel ? `<button type="button" class="btn" data-close>${cancel}</button>` : ''}
       ${onOk ? `<button class="btn ${peligro ? 'btn-rojo' : 'btn-marca'}" data-ok>${ic(okIcono, 'w-4 h-4')}${ok}</button>` : ''}
     </div></form>`;
+  const antes = document.activeElement; // al cerrar, el foco vuelve a quien abrió la ventana
   document.body.append(d);
   d.showModal();
-  d.addEventListener('close', () => d.remove());
+  setModalActivo(d);
+  d.addEventListener('close', () => {
+    d.remove();
+    setModalActivo($$('dialog[open]').pop() || null);
+    if (antes && antes.isConnected && !$$('dialog[open]').length) antes.focus();
+  });
   if (forzado) d.addEventListener('cancel', e => e.preventDefault());
   $$('[data-close]', d).forEach(b => b.addEventListener('click', () => d.close()));
   $('form', d).addEventListener('submit', async e => {

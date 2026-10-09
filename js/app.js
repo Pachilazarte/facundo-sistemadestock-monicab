@@ -16,7 +16,16 @@ function irA(tab) {
   if (tab === 'vender') $('#q').focus();
 }
 $('#nav').addEventListener('click', e => { const b = e.target.closest('[data-tab]'); if (b) irA(b.dataset.tab); });
-window.addEventListener('keydown', e => { if (e.key === 'F2') { e.preventDefault(); irA('vender'); } });
+window.addEventListener('keydown', e => { if (e.key === 'F2' && !getModalActivo()) { e.preventDefault(); irA('vender'); } });
+
+/* Vista grande: letra y botones más grandes, el menú pasa arriba en una botonera. No saca ninguna opción. Se recuerda en este equipo. */
+function vistaGrande(on, guardar) {
+  document.documentElement.classList.toggle('vg', on);
+  const b = $('#btnVG'); b.setAttribute('aria-checked', on); b.classList.toggle('on', on);
+  if (guardar) try { localStorage.setItem('stocklite_vg', on ? '1' : '0'); } catch (e) {}
+}
+$('#btnVG').addEventListener('click', () => vistaGrande(!document.documentElement.classList.contains('vg'), true));
+vistaGrande(document.documentElement.classList.contains('vg'));
 
 function renderVista(tab = tabActual) {
   if (tab === 'vender') {
@@ -262,7 +271,7 @@ function renderStock() {
     const margen = p.precio > 0 ? Math.round((p.precio - p.costo) / p.precio * 100) : 0;
     const pill = p.stock <= 0 ? ['bg-peligro-claro text-peligro', 'Agotado'] : p.stock <= p.minimo ? ['bg-aviso-claro text-aviso', 'Bajo'] : null;
     return `<tr class="${p.activo ? '' : 'opacity-50'}">
-      <td><div class="font-bold">${esc(p.nombre)}${p.activo ? '' : ' <span class="text-xs text-suave font-semibold">(inactivo)</span>'}${p.revisar ? ` <span class="ml-1 rounded-full px-2 py-0.5 text-xs font-bold bg-peligro-claro text-peligro" title="${esc(p.revisar)}">Revisar</span>` : ''}</div>
+      <td><div class="font-bold cursor-pointer rounded" tabindex="0" data-a="ed" data-c="${esc(p.codigo)}" title="Editar">${esc(p.nombre)}${p.activo ? '' : ' <span class="text-xs text-suave font-semibold">(inactivo)</span>'}${p.revisar ? ` <span class="ml-1 rounded-full px-2 py-0.5 text-xs font-bold bg-peligro-claro text-peligro" title="${esc(p.revisar)}">Revisar</span>` : ''}</div>
         <div class="text-xs text-suave"><span class="font-mono">N° ${esc(p.codigo)}</span>${p.categoria ? ' · ' + esc(p.categoria) : ''}</div></td>
       <td class="r num text-suave">${money(p.costo)}</td>
       <td class="r num font-bold">${money(p.precio)}</td>
@@ -280,7 +289,7 @@ function renderStock() {
 $('#qs').addEventListener('input', debounce(renderStock));
 $('#chipBajo').addEventListener('click', () => { soloBajo = !soloBajo; renderStock(); });
 $('#stockBody').addEventListener('click', e => {
-  const b = e.target.closest('button[data-a]'); if (!b) return;
+  const b = e.target.closest('[data-a]'); if (!b) return;
   ({ing: () => modalIngreso(b.dataset.c), aj: () => modalAjuste(b.dataset.c), ed: () => modalProducto(b.dataset.c), del: () => modalEliminar(b.dataset.c)})[b.dataset.a]();
 });
 $('#btnNuevoProd').addEventListener('click', () => modalProducto());
@@ -377,7 +386,7 @@ function renderCobros() {
   $('#cobrosBody').innerHTML = l.length ? l.map(x => {
     const dias = diasDesde(x.fecha);
     return `<tr>
-      <td><div class="flex items-center gap-3"><span class="grid place-items-center w-9 h-9 rounded-full bg-marca-claro text-marca text-xs font-extrabold shrink-0">${esc(iniciales(x.cliente))}</span><b>${esc(x.cliente)}</b></div></td>
+      <td><div class="flex items-center gap-3 cursor-pointer rounded" tabindex="0" data-pay="${x.id}"><span class="grid place-items-center w-9 h-9 rounded-full bg-marca-claro text-marca text-xs font-extrabold shrink-0">${esc(iniciales(x.cliente))}</span><b>${esc(x.cliente)}</b></div></td>
       <td><span class="font-bold">#${x.id}</span><div class="text-xs ${dias > 7 ? 'text-aviso font-bold' : 'text-suave'}">${hace(dias)}</div></td>
       <td class="r num">${money(x.total)}</td><td class="r num text-suave">${money(x.pagado)}</td>
       <td class="r num font-extrabold text-peligro">${money(x.saldo)}</td>
@@ -413,7 +422,7 @@ const compro = x => !x.items ? '' : x.items.slice(0, 2).map(i => `${num(i[2])}×
 function renderVentas() {
   const q = plain($('#qv').value.trim());
   const l = S.ventas.filter(x => !q || plain(x.cliente).includes(q) || String(x.id) === q).slice(0, LIM_VENTAS);
-  $('#ventasBody').innerHTML = l.length ? l.map(x => `<tr class="fila-click" data-v="${x.id}">
+  $('#ventasBody').innerHTML = l.length ? l.map(x => `<tr class="fila-click" tabindex="0" data-v="${x.id}">
       <td class="font-bold">#${x.id}</td><td class="text-suave whitespace-nowrap">${fdateCorta(x.fecha)}</td><td class="whitespace-nowrap">${esc(x.cliente)}</td>
       <td class="text-suave text-sm max-w-[13rem] truncate">${x.items ? esc(compro(x)) : '<span class="text-marca font-bold">Ver detalle</span>'}</td>
       <td class="r num font-bold">${money(x.total)}</td><td class="r num ${x.saldo > 0.009 ? 'text-peligro font-bold' : 'text-suave'}">${x.saldo > 0.009 ? money(x.saldo) : '—'}</td><td>${badge(x.estado)}</td>

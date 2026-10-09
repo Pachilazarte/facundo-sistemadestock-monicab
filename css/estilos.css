@@ -124,3 +124,48 @@ dialog [data-body] { min-height: 0; flex: 1 1 auto; } /* el cuerpo se desplaza; 
   dialog .campo { padding-top: .45rem; padding-bottom: .45rem; }
   .etiqueta { margin-top: .6rem; }
 }
+
+/* Foco por teclado visible en filas y tarjetas */
+.fila-click:focus-visible { outline-offset: -2px; background: rgb(var(--c-hundido) / .6); }
+
+/* Atajo Alt+N: solo se muestra en Vista grande (en la vista normal queda como ayuda al apoyar el mouse) */
+.nav-hint { display: none; font-size: .68rem; font-weight: 700; opacity: .6; line-height: 1; }
+.vg-lbl { font-size: .9rem; }
+
+/* ============ VISTA GRANDE ============
+ * Letra y botones más grandes, sin sacar ninguna opción. El menú lateral pasa a una botonera arriba
+ * (con el atajo Alt+N de cada sección). Todo lo que usa rem crece junto con la letra base. */
+html.vg { font-size: 112.5%; }
+html.vg #app { flex-direction: column; }
+html.vg #lateral { width: auto !important; flex-direction: row; align-items: center; padding: .3rem .6rem; gap: .35rem; min-width: 0; }
+html.vg #marcaBox { padding: 0 .35rem 0 0; }
+html.vg #marcaTxt { display: none !important; } /* en 1024 px no entra el nombre: queda el ícono (el nombre está en el título de la ventana) */
+html.vg .sub-marca { display: none; }
+html.vg #nav { flex-direction: row; gap: .15rem; }
+html.vg #nav .nav-item {
+  width: auto; display: grid; grid-template-columns: auto auto; grid-template-areas: "i l" "i h"; column-gap: .5rem; row-gap: .1rem;
+  align-items: center; justify-items: start; padding: .35rem .6rem; font-size: 1rem;
+}
+html.vg #nav .nav-item svg { grid-area: i; }
+html.vg .nav-lbl { display: inline !important; grid-area: l; line-height: 1.1; }
+html.vg .nav-hint { display: block; grid-area: h; }
+html.vg #nDeuda:not([hidden]) { display: inline-block !important; position: absolute; top: -3px; right: -5px; margin: 0; }
+html.vg #nav .nav-item.on::before { left: 14%; right: 14%; top: auto; bottom: -5px; width: auto; height: 3px; }
+html.vg #lateralPie { margin: 0 0 0 auto; flex-direction: row; align-items: center; gap: .5rem; padding: 0; }
+html.vg #lateralPie > div { flex-direction: row !important; }
+html.vg #syncTxt { display: block !important; font-size: .68rem; line-height: 1.15; max-width: 4.6rem; padding: 0; }
+html.vg #ver { display: none !important; }
+html.vg .vg-lbl { display: none !important; } /* queda "Aa" encendido; el nombre está en el título (tooltip) */
+html.vg #btnVG { padding: .55rem .7rem; }
+
+/* Controles más cómodos de tocar y de leer */
+html.vg .btn { padding: .7rem 1.1rem; font-size: 1rem; }
+html.vg .btn-sm { padding: .45rem .8rem; font-size: .95rem; }
+html.vg .btn-ico { padding: .55rem; }
+html.vg .campo { padding: .7rem .9rem; font-size: 1.05rem; }
+html.vg .chip { padding: .45rem 1rem; font-size: .95rem; }
+html.vg .etiqueta { font-size: .85rem; }
+html.vg .tabla td { font-size: 1.05rem; }
+html.vg dialog { width: min(600px, 96vw); }
+
+#btnVG.on::before { display: none; } /* el interruptor no lleva la marca lateral de "sección actual" */
