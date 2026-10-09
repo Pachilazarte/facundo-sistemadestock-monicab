@@ -640,4 +640,5 @@ $('#ver').textContent = 'Versión ' + APP_VERSION;
 if (cargarCache()) $('#syncTxt').textContent = 'Datos de ' + horaCorta(S.ts) + ' · actualizando…';
 renderAll();
 colaLista.then(() => { reaplicarFaltantes(); actualizarAvisoCola(); renderVista(); }); // lo guardado sin internet reaparece al abrir
-if (CFG.url) sync(true); else pedirLink();
+if (CFG.url) { sync(true); revisarPuntero(); } // el puntero se mira en paralelo: no demora nada
+else revisarPuntero().then(ok => { if (ok) sync(true); else pedirLink(); });

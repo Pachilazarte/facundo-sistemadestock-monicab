@@ -10,7 +10,16 @@
 // Link del servidor (Apps Script). Orden: ?c= en la dirección (link de instalación) > guardado en este equipo > js/config.js
 const URL_OK = /^(https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec|http:\/\/localhost:\d+\/api)$/; // localhost: solo para pruebas
 function aUrl(c) { c = String(c || '').trim(); return c.startsWith('http') ? c : (c ? 'https://script.google.com/macros/s/' + c + '/exec' : ''); }
+// LINK PUNTERO ("link de lectura"): una hoja de Google publicada que solo contiene el link ACTUAL de la planilla.
+// Se carga una sola vez en cada compu (?p=...) y no cambia nunca. Si algún día cambia el link de la planilla, se edita esa hoja
+// y todas las compus lo toman solas al abrir la app. Nunca va en el repo (que es público): vive en el Drive del dueño.
+const PTR_OK = /^(https:\/\/docs\.google\.com\/spreadsheets\/d\/e\/[\w-]+\/pub\?[\w=&%.\-]*|https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec|http:\/\/localhost:\d+\/puntero)$/;
+const EXEC_EN_TEXTO = /https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec|http:\/\/localhost:\d+\/api/;
 function resolverUrl() {
+  try {
+    const q = new URLSearchParams(location.search), p = String(q.get('p') || '').trim();
+    if (PTR_OK.test(p)) { localStorage.setItem('stocklite_puntero', p); q.delete('p'); history.replaceState(null, '', location.pathname + (q.toString() ? '?' + q : '')); }
+  } catch (e) {}
   try {
     const c = aUrl(new URLSearchParams(location.search).get('c'));
     if (URL_OK.test(c)) { localStorage.setItem('stocklite_url', c); history.replaceState(null, '', location.pathname); return c; }
@@ -122,6 +131,7 @@ async function sync(silencioso) {
   } catch (e) {
     if (mi !== syncSeq) return;
     S.error = e.message; estadoSync();
+    revisarPuntero(); // por si el link de la planilla cambió: el puntero dice a dónde pasar
     if (!silencioso || !S.cargado) renderAll();
     if (!silencioso) toast(e.message, 'err');
   } finally { if (mi === syncSeq) $('#btnSync').classList.remove('girando'); }
@@ -133,12 +143,27 @@ async function mudarse(nueva) {
   try {
     sessionStorage.setItem('stocklite_mudado', '1'); // evita vueltas infinitas si dos links se apuntan entre sí
     CFG.url = nueva;
-    await api('cargar');
+    await api('cargar');             // se prueba que el nuevo responda ANTES de cambiar
     localStorage.setItem('stocklite_url', nueva);
-    localStorage.removeItem(CACHE_KEY); localStorage.removeItem('stocklite_ticket_v1'); // eran datos de la planilla anterior
-    location.reload();
-    await new Promise(() => {}); // la página se recarga: no seguir
+    location.reload();               // lo guardado sin subir (cola) y el ticket abierto se conservan
+    await new Promise(() => {});     // la página se recarga: no seguir
   } catch (e) { CFG.url = vieja; }
+}
+
+// Lee el link puntero (si hay) y, si apunta a otra planilla, la app se pasa sola. Falla en silencio: sin internet sigue como está.
+let punteroSeq = 0;
+async function revisarPuntero() {
+  let p = ''; try { p = localStorage.getItem('stocklite_puntero') || ''; } catch (e) {}
+  if (!PTR_OK.test(p)) return false;
+  const mi = ++punteroSeq, ctl = new AbortController(), t = setTimeout(() => ctl.abort(), 10000);
+  try {
+    const r = await fetch(p + (p.includes('?') ? '&' : '?') + 't=' + Date.now(), {cache: 'no-store', signal: ctl.signal});
+    const m = (await r.text()).match(EXEC_EN_TEXTO);
+    if (mi !== punteroSeq || !m || !URL_OK.test(m[0])) return false;
+    if (!CFG.url) { CFG.url = m[0]; try { localStorage.setItem('stocklite_url', m[0]); } catch (e) {} return true; } // primera vez: no hay link, se toma del puntero
+    if (m[0] !== CFG.url && !sessionStorage.getItem('stocklite_mudado')) await mudarse(m[0]);
+  } catch (e) {} finally { clearTimeout(t); }
+  return false;
 }
 
 function estadoSync() {
@@ -148,5 +173,5 @@ function estadoSync() {
 }
 
 // Por si se tocó la planilla a mano: al volver a la ventana después de 10+ minutos se actualiza. Y si volvió internet tras un corte.
-document.addEventListener('visibilitychange', () => { if (!document.hidden && Date.now() - ultimaSync > 600000) sync(true); });
+document.addEventListener('visibilitychange', () => { if (!document.hidden && Date.now() - ultimaSync > 600000) { revisarPuntero(); sync(true); } });
 window.addEventListener('online', () => { if (S.error) sync(true); });
