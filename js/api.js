@@ -18,16 +18,23 @@ const EXEC_EN_TEXTO = /https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec|ht
 function resolverUrl() {
   try {
     const q = new URLSearchParams(location.search), p = String(q.get('p') || '').trim();
+    const k = String(q.get('k') || '').trim();
+    if (/^[\w-]{8,64}$/.test(k)) { localStorage.setItem('stocklite_k', k); q.delete('k'); history.replaceState(null, '', location.pathname + (q.toString() ? '?' + q : '')); }
     if (PTR_OK.test(p)) { localStorage.setItem('stocklite_puntero', p); q.delete('p'); history.replaceState(null, '', location.pathname + (q.toString() ? '?' + q : '')); }
   } catch (e) {}
+  const f = aUrl(CONEXION.url), fOk = URL_OK.test(f);
   try {
     const c = aUrl(new URLSearchParams(location.search).get('c'));
-    if (URL_OK.test(c)) { localStorage.setItem('stocklite_url', c); history.replaceState(null, '', location.pathname); return c; }
+    if (URL_OK.test(c)) { localStorage.setItem('stocklite_url', c); if (fOk) localStorage.setItem('stocklite_cfg_visto', f); history.replaceState(null, '', location.pathname); return c; }
     const g = localStorage.getItem('stocklite_url') || '';
+    // El link escrito en js/config.js manda: si cambió desde la última vez que esta compu lo vio, la compu se pasa sola a ese link.
+    if (fOk && localStorage.getItem('stocklite_cfg_visto') !== f) {
+      localStorage.setItem('stocklite_url', f); localStorage.setItem('stocklite_cfg_visto', f);
+      return f;
+    }
     if (URL_OK.test(g)) return g;
   } catch (e) {}
-  const f = aUrl(CONEXION.url);
-  return URL_OK.test(f) ? f : '';
+  return fOk ? f : '';
 }
 const CFG = {url: resolverUrl()};
 
@@ -45,7 +52,7 @@ async function apiUna(action, data, rid, ms = 45000) {
   try {
     r = await fetch(CFG.url, {
       method: 'POST', headers: {'Content-Type': 'text/plain;charset=utf-8'},
-      body: JSON.stringify({action, rid, ...data}), signal: ctl.signal
+      body: JSON.stringify({action, rid, k: (() => { try { return localStorage.getItem('stocklite_k') || ''; } catch (e) { return ''; } })(), ...data}), signal: ctl.signal
     });
   } catch (e) {
     clearTimeout(t);

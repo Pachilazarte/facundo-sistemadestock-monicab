@@ -26,7 +26,7 @@ const COLS = {
   Movimientos: ['Fecha', 'ID Producto', 'Producto', 'Tipo', 'Cantidad', 'Stock final', 'Nota']
 };
 // Se sube cuando cambia algo que el HTML necesita (la app avisa si el servidor del cliente quedó atrás).
-const VERSION_SERVIDOR = 5;
+const VERSION_SERVIDOR = 6;
 const MONEDA = '$ #,##0.00', FECHA = 'dd/mm/yyyy hh:mm';
 // [columna inicial, cantidad de columnas, formato]
 const FORMATOS = {
@@ -47,6 +47,7 @@ function onOpen() {
     .addItem('Configurar / reparar sistema', 'configurarSistema')
     .addItem('Revisar datos', 'revisarDatosMenu')
     .addItem('Activar respaldo diario', 'activarRespaldoDiario')
+    .addItem('Clave de acceso (ver / crear)', 'claveAccesoMenu')
     .addSeparator()
     .addItem('Mudar la app a otro link…', 'configurarRedireccion')
     .addItem('Quitar la mudanza', 'quitarRedireccion')
@@ -238,6 +239,26 @@ function quitarRedireccion() {
   avisar_('Mudanza quitada. Este link vuelve a funcionar como siempre.');
 }
 
+// CLAVE DE ACCESO: el link de la app web no alcanza para usar la planilla; hace falta también esta clave (que cada computadora
+// guarda una vez y nunca cambia). Así el link puede estar escrito en el código público de la app sin que nadie pueda usarlo.
+// Si todavía no se creó una clave, la planilla funciona como antes (sin clave).
+function verificarClave_(req) {
+  const clave = PropertiesService.getScriptProperties().getProperty('CLAVE_ACCESO');
+  if (clave && String(req.k || '') !== clave) throw new Error('No autorizado: falta la clave de acceso. Abrí el link de instalación de este equipo.');
+}
+function claveAccesoMenu() {
+  const props = PropertiesService.getScriptProperties();
+  let clave = props.getProperty('CLAVE_ACCESO');
+  const nueva = !clave;
+  if (nueva) {
+    clave = (Utilities.getUuid() + Utilities.getUuid()).replace(/-/g, '').slice(0, 32);
+    props.setProperty('CLAVE_ACCESO', clave);
+  }
+  avisar_((nueva ? 'Clave creada ✅' : 'Clave de acceso actual') + '\n\n' + clave + '\n\n' +
+    'Se carga UNA sola vez en cada computadora (agregando &k=' + clave + ' al link de instalación) y no cambia aunque cambie el link de la app web.\n' +
+    (nueva ? 'IMPORTANTE: desde ahora, las computadoras que no tengan la clave dejan de poder usar la planilla hasta abrir el link de instalación con la clave.' : 'Guardala en un lugar seguro.'));
+}
+
 function revisarDatosMenu() {
   const av = revisarDatos_(leerProductos_());
   avisar_(av.length ? 'Hay ' + av.length + ' cosas para revisar:\n\n• ' + av.join('\n• ') : 'Todo en orden ✅');
@@ -266,7 +287,9 @@ function doGet() {
 function doPost(e) {
   let res;
   try {
-    res = despachar_(JSON.parse(e.postData.contents));
+    const req = JSON.parse(e.postData.contents);
+    verificarClave_(req);
+    res = despachar_(req);
   } catch (err) {
     res = { ok: false, error: err.message || String(err) };
   }
