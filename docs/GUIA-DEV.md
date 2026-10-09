@@ -1,8 +1,7 @@
 # Stock Lite — Guía para desarrolladores
 
 Sistema liviano de **stock + ventas + cobros** sobre Google Sheets, operado por una sola persona, pensado para una netbook vieja
-(Atom N2600, 2 GB, 1024×600, Debian + Chromium). **Proyecto aparte** de la plataforma de Escencial Consultora: no comparte cuentas,
-datos ni código con ella.
+(Atom N2600, 2 GB, 1024×600, Debian + Chromium). **Proyecto independiente**: no comparte cuentas, datos ni código con otros sistemas.
 
 > Las credenciales y la clave de acceso **no están en este repositorio** (es público). Están en el archivo privado del dueño
 > (`STOCKLITE-PRIVADO`, fuera de git). Si sos dev nuevo, pedíselo a Facundo Lazarte.
@@ -126,4 +125,3 @@ y reabrir, reintento del mismo `rid` días después (no duplica), fecha real, st
 - El código se publica desde la cuenta de GitHub **Pachilazarte** (`gh auth switch --user Pachilazarte` antes de `git push` si el CLI
   quedó con otra sesión; el error 403 significa eso).
 - Hacer el repo **privado apaga GitHub Pages** en cuentas gratuitas: no hacerlo. Y no serviría para ocultar el link (lo servido es público igual).
-- Este proyecto **no toca** ninguna cuenta ni recurso de la empresa Escencial Consultora.
